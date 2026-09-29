@@ -10,7 +10,8 @@
     "build": "npm run clean && tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "mock:proconnect": "node ../mock-proconnect/server.mjs"
   },
   "keywords": [],
   "author": "",

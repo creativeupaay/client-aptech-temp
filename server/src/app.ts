@@ -12,10 +12,22 @@ const app: Application = express();
 // Security HTTP headers
 app.use(helmet());
 
+const allowedOrigins = [
+  env.CLIENT_URL,
+  "http://localhost:5175",
+  "http://127.0.0.1:5175",
+];
+
 // Cross-Origin Resource Sharing
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],

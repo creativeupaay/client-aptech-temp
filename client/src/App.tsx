@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthPage } from "./features/auth";
+import { AuthPage, SSOCallbackPage } from "./features/auth";
 import { StudentDashboardPage } from "./features/dashboard";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { PublicRoute } from "./routes/PublicRoute";
@@ -35,6 +35,10 @@ function App() {
             </PublicRoute>
           }
         />
+
+        {/* ProConnect SSO Callback Route (Zero-PII Authorization Code Exchange) */}
+        <Route path="/sso/callback" element={<SSOCallbackPage />} />
+
 
         {/* Protected student routes */}
         <Route

@@ -1,0 +1,13 @@
+{
+  "name": "mock-proconnect-portal",
+  "version": "1.0.0",
+  "description": "Mock Aptech ProConnect Student Portal (IdP) for local SSO testing on port 5175",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "keywords": ["sso", "proconnect", "mock-idp"],
+  "license": "ISC"
+}

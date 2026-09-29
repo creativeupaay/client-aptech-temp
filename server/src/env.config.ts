@@ -46,6 +46,18 @@ const envSchema = z.object({
   SMS_PROVIDER: z
     .enum(["mock", "twilio", "gupshup"])
     .default("mock"),
+  PROCONNECT_API_URL: z
+    .string()
+    .default("http://localhost:8000/api/v1/mock/proconnect"),
+  PROCONNECT_CLIENT_ID: z
+    .string()
+    .default("tbx_aptech_client_2026"),
+  PROCONNECT_CLIENT_SECRET: z
+    .string()
+    .default("tbx_aptech_secret_super_secure_2026"),
+  PROCONNECT_PROVIDER: z
+    .enum(["mock", "http"])
+    .default("mock"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

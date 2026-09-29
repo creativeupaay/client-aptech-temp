@@ -2,7 +2,14 @@ import { type Request, type Response, type NextFunction } from "express";
 import { AuthService } from "./auth.service.js";
 import { sendResponse } from "../../utils/apiResponse.js";
 import type { AuthenticatedRequest } from "../../middlewares/auth.middleware.js";
-import type { SignupInput, VerifyOtpInput, ResendOtpInput, LoginInput } from "./auth.validation.js";
+import type {
+  SignupInput,
+  VerifyOtpInput,
+  ResendOtpInput,
+  LoginInput,
+  SsoExchangeInput,
+  SimulateSsoCodeInput,
+} from "./auth.validation.js";
 
 export class AuthController {
   public static async signup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -104,4 +111,35 @@ export class AuthController {
       next(error);
     }
   }
+
+  public static async ssoExchange(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { code } = req.body as SsoExchangeInput;
+      const result = await AuthService.exchangeProconnectCode(code);
+      // Set secure HTTP-only cookies
+      AuthService.setAuthCookies(res, result.tokens);
+
+      sendResponse(res, {
+        statusCode: 200,
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async simulateSsoCode(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await AuthService.simulateProconnectCode(req.body as SimulateSsoCodeInput);
+      sendResponse(res, {
+        statusCode: 200,
+        message: "Simulated ProConnect authorization code generated.",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

@@ -91,8 +91,24 @@ export const loginSchema = z.object({
     .min(1, "Password is required"),
 });
 
+export const ssoExchangeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, "Authorization code is required"),
+});
+
+export const simulateSsoCodeSchema = z.object({
+  studentId: z.string().trim().optional(),
+  name: z.string().trim().optional(),
+  mobile: z.string().trim().optional(),
+  email: z.string().trim().optional(),
+});
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type SsoExchangeInput = z.infer<typeof ssoExchangeSchema>;
+export type SimulateSsoCodeInput = z.infer<typeof simulateSsoCodeSchema>;
 

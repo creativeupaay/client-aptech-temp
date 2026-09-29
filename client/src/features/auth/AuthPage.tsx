@@ -67,3 +67,5 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = "signup" }) =>
     </div>
   );
 };
+
+

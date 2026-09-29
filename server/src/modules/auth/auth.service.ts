@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { type Response } from "express";
 import { env } from "../../env.config.js";
@@ -6,6 +7,7 @@ import { ApiError } from "../../utils/ApiError.js";
 import { User, type IUserDocument } from "../user/user.model.js";
 import { Card } from "../card/card.model.js";
 import { OtpService } from "../otp/otp.service.js";
+import { ProconnectFactory, type ProconnectStudentProfile } from "../../services/proconnect/index.js";
 import {
   type SignupInput,
   type VerifyOtpInput,
@@ -354,4 +356,120 @@ export class AuthService {
       },
     };
   }
+
+  /**
+   * Exchanges an authorization code from Aptech ProConnect for student identity,
+   * performs automatic account linking and card discovery, and establishes a TBX session.
+   */
+  public static async exchangeProconnectCode(code: string) {
+    const provider = ProconnectFactory.getProvider();
+    const studentProfile = await provider.exchangeCode(code);
+
+    const sanitizedMobile = sanitizeMobileNumber(studentProfile.mobile);
+    if (!sanitizedMobile || !/^[6-9]\d{9}$/.test(sanitizedMobile)) {
+      throw ApiError.badRequest("Invalid student mobile number received from ProConnect.");
+    }
+
+    // Step 1: Look for existing student by studentId or mobile (priority to studentId)
+    let user = await User.findOne({ studentId: studentProfile.studentId });
+    if (!user) {
+      user = await User.findOne({ mobile: sanitizedMobile });
+    }
+
+    if (user) {
+      // Step 2a: Automatic Account Linking
+      // Link studentId if it was previously missing (e.g. from non-Aptech prospect signup)
+      if (!user.studentId) {
+        user.studentId = studentProfile.studentId;
+      }
+      user.userType = "aptech_student";
+      user.isMobileVerified = true;
+      user.status = "active";
+      if (!user.name && studentProfile.name) {
+        user.name = studentProfile.name;
+      }
+      await user.save();
+    } else {
+      // Step 2b: New Aptech student onboarding
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+      user = await User.create({
+        name: studentProfile.name,
+        email: studentProfile.email.toLowerCase().trim(),
+        mobile: sanitizedMobile,
+        studentId: studentProfile.studentId,
+        highestEducation: "Undergraduate / Bachelor's",
+        passwordHash,
+        isMobileVerified: true,
+        isEmailVerified: true,
+        status: "active",
+        userType: "aptech_student",
+        role: "student",
+      });
+    }
+
+    // Step 3: Card verification & automatic initialization
+    const card = await Card.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $setOnInsert: {
+          userId: user._id,
+          status: "NOT_APPLIED",
+          cardType: "VIRTUAL",
+          kycStatus: "MIN_KYC",
+          isLocked: false,
+        },
+      },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+
+    const isCardIssued = card.status !== "NOT_APPLIED" && card.status !== "APPLICATION_PENDING";
+
+    // Step 4: Issue standard TBX JWT Access & Refresh Tokens
+    const tokens = this.generateTokens(user);
+
+    return {
+      message: isCardIssued
+        ? "ProConnect SSO successful. Welcome back to your card dashboard!"
+        : "ProConnect SSO successful. Student verified.",
+      token: tokens.accessToken,
+      tokens,
+      isCardIssued,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        studentId: user.studentId,
+        highestEducation: user.highestEducation,
+        isMobileVerified: user.isMobileVerified,
+        status: user.status,
+        userType: user.userType,
+        role: user.role,
+      },
+      card: {
+        status: card.status,
+        cardType: card.cardType,
+        kycStatus: card.kycStatus,
+        maskedPan: card.maskedPan,
+      },
+    };
+  }
+
+  /**
+   * Generates a mock ProConnect SSO authorization code for local development and testing.
+   */
+  public static async simulateProconnectCode(profile?: Partial<ProconnectStudentProfile>) {
+    const provider = ProconnectFactory.getProvider();
+    if (!provider.generateMockCode) {
+      throw ApiError.badRequest("Simulate code is only available when using mock ProConnect provider.");
+    }
+    const code = await provider.generateMockCode(profile);
+    return {
+      code,
+      redirectUrl: `${env.CLIENT_URL}/sso/callback?code=${code}`,
+    };
+  }
 }
+

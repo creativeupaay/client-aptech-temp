@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useLogoutMutation } from "../auth/authApi";
+import { useLogoutMutation, useGetMeQuery } from "../auth/authApi";
 import {
   DashboardHeader,
   CardSection,
@@ -18,6 +18,7 @@ import { MOCK_DASHBOARD_DATA } from "./mockData";
 export const StudentDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [logoutMutation] = useLogoutMutation();
+  const { data: meData } = useGetMeQuery();
 
   const handleLogout = async () => {
     try {
@@ -31,11 +32,31 @@ export const StudentDashboardPage: React.FC = () => {
     }
   };
 
-  // Strictly use mock data as instructed: "use mock data for now but make the UI exactly same"
+  const storedUser = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem("tbx_student_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const activeUser = meData?.data?.user || storedUser;
+  const userName = activeUser?.name || MOCK_DASHBOARD_DATA.user.name;
+  const studentId = activeUser?.studentId || MOCK_DASHBOARD_DATA.user.studentId;
+  const initials =
+    userName
+      .split(" ")
+      .map((part: string) => part[0])
+      .filter(Boolean)
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || MOCK_DASHBOARD_DATA.user.initials;
+
   const user = {
-    name: MOCK_DASHBOARD_DATA.user.name,
-    studentId: MOCK_DASHBOARD_DATA.user.studentId,
-    initials: MOCK_DASHBOARD_DATA.user.initials,
+    name: userName,
+    studentId,
+    initials,
   };
 
   return (
