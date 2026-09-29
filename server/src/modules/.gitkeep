@@ -1,0 +1,2 @@
+# Feature modules domain root
+# Each feature module should contain its isolated models, controllers, routes, services, and schemas.

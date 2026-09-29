@@ -1,0 +1,7 @@
+# Feature domains root
+# Structure each feature as:
+# src/features/<feature-name>/
+# ├── api/           # Private RTK Query endpoints injected into baseApi
+# ├── components/    # Feature-specific UI components
+# ├── types/         # Domain TypeScript models
+# └── index.ts       # Barrel export (EXPOSE ONLY UI components/pages; keep APIs private)
