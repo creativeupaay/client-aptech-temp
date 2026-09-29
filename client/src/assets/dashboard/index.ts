@@ -5,6 +5,7 @@ import aptechLogo from "./aptech-logo.webp";
 import rupayPrepaidLogo from "./rupay-prepaid-logo.webp";
 import maacLogo from "./maac-logo.webp";
 import arenaAnimationsLogo from "./arena-animations-logo.webp";
+import financialSolutionBg from "./FinancialSolutionBG.webp";
 
 export {
   cardBg,
@@ -14,4 +15,5 @@ export {
   rupayPrepaidLogo,
   maacLogo,
   arenaAnimationsLogo,
+  financialSolutionBg,
 };

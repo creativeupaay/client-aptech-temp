@@ -13,41 +13,151 @@ export const RewardStats: React.FC<RewardStatsProps> = ({
   onRedeemVouchers,
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-      {/* Cashback */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-2xs flex flex-col justify-center">
-        <span className="text-xs text-gray-700 font-semibold block">
+    <div className="flex flex-col sm:flex-row items-center gap-[10px] w-full max-w-[560px]">
+      {/* Cashback Card */}
+      <div
+        className="w-full sm:w-[143px] h-[73px] rounded-[12px] p-[16px] bg-[#FFFFFF] flex flex-col justify-between shrink-0 shadow-2xs select-none"
+        style={{
+          height: "73px",
+          borderRadius: "12px",
+          border: "1px solid #E8E8EB",
+          padding: "16px",
+          backgroundColor: "#FFFFFF",
+          opacity: 1,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 600,
+            fontSize: "13px",
+            lineHeight: "100%",
+            letterSpacing: "0%",
+            color: "#1C1C21",
+          }}
+        >
           Cashback
         </span>
-        <p className="text-lg font-bold text-[#D85A14] mt-0.5">
+        <p
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 800,
+            fontSize: "18px",
+            lineHeight: "100%",
+            letterSpacing: "0%",
+            color: "#DB6516",
+          }}
+        >
           +₹{cashback}
         </p>
       </div>
 
-      {/* Loyalty Points */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-2xs flex flex-col justify-center">
-        <span className="text-xs text-gray-700 font-semibold block">
+      {/* Loyalty Points Card */}
+      <div
+        className="w-full sm:w-[143px] h-[73px] rounded-[12px] p-[16px] bg-[#FFFFFF] flex flex-col justify-between shrink-0 shadow-2xs select-none"
+        style={{
+          height: "73px",
+          borderRadius: "12px",
+          border: "1px solid #E8E8EB",
+          padding: "16px",
+          backgroundColor: "#FFFFFF",
+          opacity: 1,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 600,
+            fontSize: "13px",
+            lineHeight: "100%",
+            letterSpacing: "0%",
+            color: "#1C1C21",
+          }}
+        >
           Loyalty Points
         </span>
-        <p className="text-lg font-bold text-[#D85A14] mt-0.5">
+        <p
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 800,
+            fontSize: "18px",
+            lineHeight: "100%",
+            letterSpacing: "0%",
+            color: "#DB6516",
+          }}
+        >
           {loyaltyPoints}
         </p>
       </div>
 
-      {/* Redeem Vouchers CTA */}
+      {/* Redeem Vouchers Card with Diagonal Radial Gradients & Crossing Grid Lines */}
       <button
         type="button"
         onClick={onRedeemVouchers}
-        className="bg-white hover:bg-orange-50/30 rounded-xl border border-gray-200 p-3 shadow-2xs flex items-center justify-between group cursor-pointer transition text-left"
+        className="relative overflow-hidden rounded-[12px] w-full sm:flex-1 h-[73px] flex items-center group cursor-pointer transition-all active:scale-[0.99] text-left shadow-2xs select-none"
+        style={{
+          height: "73px",
+          borderRadius: "12px",
+          border: "1px solid #FFBF94",
+          background: `
+            radial-gradient(120% 120% at 100% 0%, rgba(219, 101, 22, 0.07) 0%, rgba(219, 101, 22, 0.02) 50%, transparent 80%),
+            radial-gradient(120% 120% at 0% 100%, rgba(45, 45, 55, 0.04) 0%, rgba(45, 45, 55, 0.01) 45%, transparent 75%),
+            #FFFFFF
+          `,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          opacity: 1,
+        }}
       >
-        <span className="text-xs sm:text-sm font-bold text-[#D85A14]">
-          Redeem Vouchers
-        </span>
-        <ArrowRight
-          size={16}
-          className="text-[#D85A14] transition-transform group-hover:translate-x-0.5"
+        {/* Horizontal 1px Line (#E8E8EB, opacity: 60%, crossing just below vouchers bottom) */}
+        <div
+          className="absolute left-0 right-0 h-[1px] pointer-events-none"
+          style={{
+            top: "47px",
+            backgroundColor: "#E8E8EB",
+            opacity: 0.6,
+          }}
         />
+
+        {/* Content Row: Text + Vertical Line just after 's' + Arrow in same row */}
+        <div className="relative z-10 flex items-center h-full w-full">
+          {/* Text block */}
+          <div className="pl-[16px] pr-[12px] flex items-center shrink-0">
+            <span
+              className="whitespace-nowrap"
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 700,
+                fontSize: "16px",
+                lineHeight: "100%",
+                letterSpacing: "0%",
+                color: "#DB6516",
+              }}
+            >
+              Redeem Vouchers
+            </span>
+          </div>
+
+          {/* Vertical 1px Line placed just after 's' */}
+          <div
+            className="w-[1px] h-full shrink-0"
+            style={{
+              backgroundColor: "#E8E8EB",
+              opacity: 0.6,
+            }}
+          />
+
+          {/* Arrow container - in the exact same row as text */}
+          <div className="flex-1 flex items-center justify-center">
+            <ArrowRight
+              size={18}
+              className="text-[#DB6516] transition-transform group-hover:translate-x-1 shrink-0"
+              strokeWidth={2}
+            />
+          </div>
+        </div>
       </button>
     </div>
   );
 };
+

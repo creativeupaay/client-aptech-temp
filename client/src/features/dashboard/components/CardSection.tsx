@@ -1,23 +1,99 @@
 import React, { useState } from "react";
-import { CardSim, Wifi } from "lucide-react";
 import {
   cardBg,
+  aptechLogo,
   rupayPrepaidLogo,
 } from "../../../assets/dashboard";
+import { Button } from "../../../components/ui";
 
 interface CardSectionProps {
   holderName?: string;
+  cardNumber?: string;
   maskedPan?: string;
   expiry?: string;
   cvv?: string;
   onViewDetails?: () => void;
 }
 
+/** EMV Chip SVG matching the exact card design */
+const EmvChip: React.FC = () => (
+  <svg
+    width="38"
+    height="28"
+    viewBox="0 0 38 28"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="shrink-0 drop-shadow-xs"
+  >
+    <rect
+      x="0.75"
+      y="0.75"
+      width="36.5"
+      height="26.5"
+      rx="4.25"
+      fill="white"
+      fillOpacity="0.12"
+      stroke="white"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M1 9.5H13C15.4853 9.5 17.5 11.5147 17.5 14C17.5 16.4853 15.4853 18.5 13 18.5H1"
+      stroke="white"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+    <path
+      d="M37 9.5H25C22.5147 9.5 20.5 11.5147 20.5 14C20.5 16.4853 22.5147 18.5 25 18.5H37"
+      stroke="white"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+    <path
+      d="M19 1V9.5M19 18.5V27"
+      stroke="white"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/** 3-Arc Contactless Waves SVG matching the exact card design */
+const ContactlessWaves: React.FC = () => (
+  <svg
+    width="22"
+    height="24"
+    viewBox="0 0 22 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="shrink-0 drop-shadow-xs"
+  >
+    <path
+      d="M3 8.5C4.8 10.2 4.8 13.8 3 15.5"
+      stroke="white"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M8.5 6C11.5 8.5 11.5 15.5 8.5 18"
+      stroke="white"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M14 3.5C18.2 6.8 18.2 17.2 14 20.5"
+      stroke="white"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export const CardSection: React.FC<CardSectionProps> = ({
   holderName = "Aarav Sharma",
-  maskedPan = "••••  ••••  ••••  ••••",
-  expiry = "••/••",
-  cvv = "•••",
+  cardNumber = "6521  8920  3411  8942",
+  maskedPan,
+  expiry = "08/29",
+  cvv = "842",
   onViewDetails,
 }) => {
   const [showDetails, setShowDetails] = useState(false);
@@ -28,78 +104,102 @@ export const CardSection: React.FC<CardSectionProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Top action pill */}
-      <div>
-        <button
-          type="button"
-          className="bg-aptech-primary hover:bg-aptech-primary-hover text-white text-xs font-semibold px-4 py-1.5 rounded-md cursor-pointer transition shadow-2xs"
-        >
-          Card management
-        </button>
-      </div>
-
-      {/* The Physical Card Mockup */}
+    <div className="flex flex-col gap-3 w-full lg:max-w-[560px]">
+      {/* Physical / Virtual Card Mockup */}
       <div
-        className="w-full relative rounded-2xl overflow-hidden shadow-sm text-white aspect-[2/1] select-none p-5 sm:p-6 flex flex-col justify-between"
-      style={{
+        className="w-full lg:w-[560px] h-[274px] relative overflow-hidden shadow-md text-white select-none p-5 sm:p-7 flex flex-col justify-between"
+        style={{
+          width: "100%",
+          maxWidth: "560px",
+          height: "274px",
+          borderRadius: "4.43px",
+          border: "0.55px solid #FFFFFF4D",
+          backdropFilter: "blur(9.416419982910156px)",
+          WebkitBackdropFilter: "blur(9.416419982910156px)",
           backgroundImage: `url(${cardBg})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
+          opacity: 1,
         }}
       >
         {/* Soft overlay */}
         <div className="absolute inset-0 bg-black/5 pointer-events-none" />
 
-        {/* Card Middle: Holder Name, Chip & Contactless */}
-        <div className="relative z-10 flex flex-col gap-1.5 my-auto">
-          <div>
-            <span className="text-[9px] tracking-wider text-white/80 uppercase font-medium block">
+        {/* Top: Aptech Brand Logo */}
+        <div className="relative z-10 flex items-start justify-between">
+          <img
+            src={aptechLogo}
+            alt="Aptech - Unleash your potential"
+            className="h-8 sm:h-9 object-contain drop-shadow-xs"
+          />
+        </div>
+
+        {/* Middle Section: Cardholder Name, Chip & Contactless */}
+        <div className="relative z-10 flex flex-col my-auto">
+          {/* Cardholder Name */}
+          <div className="mb-2">
+            <span className="text-[10px] tracking-wider text-white/90 uppercase font-medium block">
               CARD HOLDER NAME
             </span>
-            <p className="text-xl sm:text-2xl font-bold tracking-tight text-white drop-shadow-xs">
+            <p className="text-xl sm:text-2xl font-bold tracking-tight text-white drop-shadow-xs mt-0.5">
               {holderName}
             </p>
           </div>
 
-          {/* Chip & NFC Contactless in White matching Figma */}
-          <div className="flex items-center gap-2.5 my-1">
-            <div className="text-white drop-shadow-xs">
-              <CardSim size={28} strokeWidth={1.5} />
-            </div>
-            <div className="text-white drop-shadow-xs rotate-90">
-              <Wifi size={20} strokeWidth={2} />
-            </div>
+          {/* EMV Chip & Contactless Waves */}
+          <div className="flex items-center gap-3 my-1">
+            <EmvChip />
+            <ContactlessWaves />
           </div>
 
-          {/* Masked Card Number */}
-          <div className="font-mono text-base sm:text-lg font-bold tracking-[0.22em] text-white drop-shadow-xs">
-            {showDetails ? "4532  8912  4401  9821" : maskedPan}
+          {/* Card Number: 4 groups of 4 dots or unmasked PAN */}
+          <div className="mt-2.5">
+            {showDetails ? (
+              <div className="font-mono text-base sm:text-lg font-bold tracking-[0.16em] sm:tracking-[0.2em] text-white drop-shadow-xs select-all">
+                {cardNumber || maskedPan || "6521  8920  3411  8942"}
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 sm:gap-6 py-1 select-none">
+                {[0, 1, 2, 3].map((groupIndex) => (
+                  <div key={groupIndex} className="flex items-center gap-1.5 sm:gap-2">
+                    {[0, 1, 2, 3].map((dotIndex) => (
+                      <span
+                        key={dotIndex}
+                        className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white block shadow-xs"
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Card Footer: Expiry, CVV & RuPay Prepaid Logo */}
+        {/* Bottom Row: Expiry, CVV & RuPay Prepaid Logo */}
         <div className="relative z-10 flex items-end justify-between pt-1">
-          <div className="flex items-center gap-5 text-xs text-white">
+          <div className="flex items-center gap-8 sm:gap-10 text-white">
+            {/* Expiry */}
             <div>
-              <span className="text-[8px] text-white/80 block uppercase tracking-wider font-medium">
+              <span className="text-[9px] text-white/90 block font-medium">
                 Expiry
               </span>
-              <span className="font-mono font-bold tracking-widest text-xs">
-                {showDetails ? "09/30" : expiry}
+              <span className="font-mono font-bold tracking-widest text-xs sm:text-sm drop-shadow-xs">
+                {showDetails ? expiry : "••/••"}
               </span>
             </div>
+
+            {/* CVV */}
             <div>
-              <span className="text-[8px] text-white/80 block uppercase tracking-wider font-medium">
+              <span className="text-[9px] text-white/90 block font-medium">
                 CVV
               </span>
-              <span className="font-mono font-bold tracking-widest text-xs">
-                {showDetails ? "849" : cvv}
+              <span className="font-mono font-bold tracking-widest text-xs sm:text-sm drop-shadow-xs">
+                {showDetails ? cvv : "•••"}
               </span>
             </div>
           </div>
 
-          {/* RuPay Prepaid Logo */}
+          {/* RuPay PREPAID Logo */}
           <div className="flex flex-col items-end">
             <img
               src={rupayPrepaidLogo}
@@ -111,13 +211,13 @@ export const CardSection: React.FC<CardSectionProps> = ({
       </div>
 
       {/* View Card Details Button */}
-      <button
-        type="button"
+      <Button
         onClick={handleToggleDetails}
-        className="w-full bg-[#D85A14] hover:bg-[#be4c0d] text-white font-medium text-xs sm:text-sm py-2.5 rounded-xl text-center shadow-2xs cursor-pointer transition active:scale-[0.99]"
+        className="w-full h-[40px] text-xs sm:text-sm font-semibold rounded-lg text-center shadow-2xs"
       >
         {showDetails ? "Hide Card Details" : "View Card Details"}
-      </button>
+      </Button>
     </div>
   );
 };
+

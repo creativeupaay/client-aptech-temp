@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { Button } from "../../../components/ui";
+import { GeneratePinModal } from "./GeneratePinModal";
 
 interface CardControlsProps {
   initialEnabled?: boolean;
@@ -17,6 +19,12 @@ export const CardControls: React.FC<CardControlsProps> = ({
 }) => {
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
   const [isLocked, setIsLocked] = useState(initialLocked);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+
+  const handleGeneratePinClick = () => {
+    setIsPinModalOpen(true);
+    onGeneratePin?.();
+  };
 
   const handleToggleEnabled = () => {
     const next = !isEnabled;
@@ -31,90 +39,98 @@ export const CardControls: React.FC<CardControlsProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs">
+    <div className="bg-white rounded-2xl border border-[#E8E8EB] p-5 sm:p-6 shadow-2xs w-full max-w-[560px]">
       {/* Title & Description */}
-      <div className="mb-4">
-        <h3 className="text-sm font-bold text-gray-900">Card Controls</h3>
-        <p className="text-xs text-gray-500 mt-0.5">
+      <div>
+        <h3 className="text-base sm:text-lg font-bold text-[#1C1C21]">
+          Card Controls
+        </h3>
+        <p className="text-xs sm:text-sm text-[#737380] mt-1">
           Manage your card PIN, usage, and lock status from one place.
         </p>
       </div>
 
       {/* Controls 3-Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Generate PIN */}
-        <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3.5 flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 mt-5">
+        {/* 1. Generate PIN */}
+        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
-            <h4 className="text-xs font-bold text-gray-800">Generate PIN</h4>
-            <p className="text-[11px] text-gray-400 mt-0.5 mb-3">
+            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Generate PIN</h4>
+            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
               Set your card PIN
             </p>
           </div>
           <div>
-            <button
-              type="button"
-              onClick={onGeneratePin}
-              className="bg-[#D85A14] hover:bg-[#be4c0d] text-white text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer transition shadow-2xs active:scale-[0.98]"
+            <Button
+              onClick={handleGeneratePinClick}
+              className="h-[30px] px-3.5 text-xs font-semibold rounded-[6px] shadow-none"
             >
               Generate PIN
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Enable / Disable */}
-        <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3.5 flex flex-col justify-between">
+        {/* 2. Enable / Disable */}
+        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
-            <h4 className="text-xs font-bold text-gray-800">Enable / Disable</h4>
-            <p className="text-[11px] text-gray-400 mt-0.5 mb-3">
+            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Enable / Disable</h4>
+            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
               Toggle card usage
             </p>
           </div>
-          <div>
+          <div className="flex items-center">
             <button
               type="button"
               role="switch"
               aria-checked={isEnabled}
               onClick={handleToggleEnabled}
-              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ease-in-out ${
-                isEnabled ? "bg-emerald-500" : "bg-gray-300"
+              className={`w-[44px] h-[25px] flex items-center rounded-full p-[2.5px] cursor-pointer transition-colors duration-200 ease-in-out ${
+                isEnabled ? "bg-[#48CD5E]" : "bg-[#DEDEE1]"
               }`}
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                  isEnabled ? "translate-x-5" : "translate-x-0"
+                className={`bg-white w-5 h-5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.15)] transform transition-transform duration-200 ease-in-out ${
+                  isEnabled ? "translate-x-[19px]" : "translate-x-0"
                 }`}
               />
             </button>
           </div>
         </div>
 
-        {/* Lock Card */}
-        <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3.5 flex flex-col justify-between">
+        {/* 3. Lock Card */}
+        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
-            <h4 className="text-xs font-bold text-gray-800">Lock Card</h4>
-            <p className="text-[11px] text-gray-400 mt-0.5 mb-3">
+            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Lock Card</h4>
+            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
               Permanent Lock
             </p>
           </div>
-          <div>
+          <div className="flex items-center">
             <button
               type="button"
               role="switch"
               aria-checked={isLocked}
               onClick={handleToggleLock}
-              className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ease-in-out ${
-                isLocked ? "bg-red-500" : "bg-gray-300"
+              className={`w-[44px] h-[25px] flex items-center rounded-full p-[2.5px] cursor-pointer transition-colors duration-200 ease-in-out ${
+                isLocked ? "bg-[#DB6516]" : "bg-[#DEDEE1]"
               }`}
             >
               <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                  isLocked ? "translate-x-5" : "translate-x-0"
+                className={`bg-white w-5 h-5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.15)] transform transition-transform duration-200 ease-in-out ${
+                  isLocked ? "translate-x-[19px]" : "translate-x-0"
                 }`}
               />
             </button>
           </div>
         </div>
       </div>
+
+      {/* Generate PIN Flow Modal */}
+      <GeneratePinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+      />
     </div>
   );
 };
+

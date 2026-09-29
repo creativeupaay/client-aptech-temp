@@ -15,6 +15,7 @@ export interface DashboardData {
   };
   card: {
     holderName: string;
+    cardNumber: string;
     maskedPan: string;
     expiry: string;
     cvv: string;
@@ -39,9 +40,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   },
   card: {
     holderName: "Aarav Sharma",
+    cardNumber: "6521  8920  3411  8942",
     maskedPan: "•••• •••• •••• ••••",
-    expiry: "••/••",
-    cvv: "•••",
+    expiry: "08/29",
+    cvv: "842",
     usedAmount: 3000,
     totalLimit: 10000,
     availableBalance: 7000,

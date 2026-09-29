@@ -1,4 +1,5 @@
 import React from "react";
+import { Button } from "../../../components/ui";
 
 interface CardBalanceBarProps {
   usedAmount?: number;
@@ -19,53 +20,51 @@ export const CardBalanceBar: React.FC<CardBalanceBarProps> = ({
   );
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Limits & Usage Bar Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-2xs">
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-bold text-[#D85A14]">
-            Used: ₹{usedAmount}
-          </span>
-          <span className="font-bold text-gray-800 tracking-wider uppercase text-[11px]">
-            TOTAL LIMIT: ₹{totalLimit.toLocaleString("en-IN")}
-          </span>
-          <span className="font-bold text-emerald-600">
-            Available: ₹{availableBalance.toLocaleString("en-IN")}
-          </span>
-        </div>
-
-        {/* Progress Bar: Slim orange used track + teal/cyan available track */}
-        <div className="w-full h-1.5 rounded-full bg-gray-100 overflow-hidden flex">
-          <div
-            className="bg-[#D85A14] h-full transition-all duration-300"
-            style={{ width: `${usedPercent}%` }}
-          />
-          <div
-            className="bg-[#059669] h-full transition-all duration-300"
-            style={{ width: `${100 - usedPercent}%` }}
-          />
-        </div>
+    <div className="bg-white rounded-2xl border border-[#E8E8EB] p-4 sm:p-5 shadow-2xs w-full flex flex-col justify-between">
+      {/* Top Row: Used / Total Limit / Available */}
+      <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
+        <span className="font-bold text-[#DB6516]">
+          Used: ₹{usedAmount}
+        </span>
+        <span className="font-bold text-[#262626] tracking-wide uppercase text-[11px] sm:text-xs">
+          TOTAL LIMIT: ₹{totalLimit.toLocaleString("en-IN")}
+        </span>
+        <span className="font-bold text-[#10B981]">
+          Available: ₹{availableBalance.toLocaleString("en-IN")}
+        </span>
       </div>
 
-      {/* Add Funds to Wallet Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3.5 shadow-2xs flex items-center justify-between">
+      {/* Progress Bar: Two-tone continuous bar (Used orange + Available green) */}
+      <div className="w-full h-1.5 rounded-full overflow-hidden flex bg-gray-100 mb-3.5">
+        <div
+          className="bg-[#DB6516] h-full transition-all duration-300"
+          style={{ width: `${usedPercent}%` }}
+        />
+        <div
+          className="bg-[#10B981] h-full transition-all duration-300"
+          style={{ width: `${100 - usedPercent}%` }}
+        />
+      </div>
+
+      {/* Bottom Row: Add Funds text + Load Money Button */}
+      <div className="flex items-center justify-between gap-3 pt-0.5">
         <div>
-          <h4 className="text-xs sm:text-sm font-bold text-[#D85A14]">
+          <h4 className="text-sm sm:text-[15px] font-bold text-[#DB6516] leading-tight">
             Add funds to your wallet
           </h4>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-xs text-[#737380] font-normal mt-0.5">
             Available Balance: ₹{availableBalance.toLocaleString("en-IN")}
           </p>
         </div>
 
-        <button
-          type="button"
+        <Button
           onClick={onLoadMoney}
-          className="bg-[#D85A14] hover:bg-[#be4c0d] text-white text-xs font-semibold px-4 py-1.5 rounded-lg cursor-pointer transition active:scale-[0.98] shadow-2xs"
+          className="h-[38px] sm:h-[40px] px-5 sm:px-6 text-xs sm:text-sm font-bold rounded-xl shadow-2xs whitespace-nowrap"
         >
           Load Money
-        </button>
+        </Button>
       </div>
     </div>
   );
 };
+

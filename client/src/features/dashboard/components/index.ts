@@ -8,3 +8,4 @@ export { CoursesBanner } from "./CoursesBanner";
 export { RecentTransactions } from "./RecentTransactions";
 export { FinancialSolutions } from "./FinancialSolutions";
 export { HelpSupport } from "./HelpSupport";
+export { GeneratePinModal } from "./GeneratePinModal";
