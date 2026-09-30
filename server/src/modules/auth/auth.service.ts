@@ -378,10 +378,8 @@ export class AuthService {
 
     if (user) {
       // Step 2a: Automatic Account Linking
-      // Link studentId if it was previously missing (e.g. from non-Aptech prospect signup)
-      if (!user.studentId) {
-        user.studentId = studentProfile.studentId;
-      }
+      // Ensure studentId is in sync with the official studentId from ProConnect
+      user.studentId = studentProfile.studentId;
       user.userType = "aptech_student";
       user.isMobileVerified = true;
       user.status = "active";

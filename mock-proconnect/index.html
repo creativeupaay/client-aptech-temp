@@ -90,6 +90,122 @@
             <span class="text-gray-500">Fee Status:</span>
             <span class="font-bold text-emerald-600">All Dues Cleared</span>
           </div>
+          <div class="flex justify-between items-center pt-1 border-t border-gray-100">
+            <span class="text-gray-500">Loyalty Points:</span>
+            <span id="cardCoinsBadge" class="font-mono font-bold text-xs text-[#D85A14] bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+              500 PTS
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aptech Loyalty Points Control Panel (Single Source of Truth) -->
+      <div class="bg-white rounded-3xl border border-gray-200 p-6 shadow-xs relative overflow-hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-lg border border-amber-500/20">
+              🪙
+            </div>
+            <div>
+              <h3 class="text-sm font-extrabold text-gray-900 leading-tight">Aptech Coin Ledger</h3>
+              <p class="text-[11px] text-gray-400 font-medium">Source of Truth (:5175)</p>
+            </div>
+          </div>
+          <span id="syncIndicator" class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            LIVE SYNC
+          </span>
+        </div>
+
+        <!-- Big Balance Display -->
+        <div class="rounded-2xl bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-transparent border border-orange-200/70 p-4 mb-4">
+          <div class="flex items-baseline justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Live Point Balance</span>
+            <span class="text-[10px] font-mono text-gray-400">Aptech Direct</span>
+          </div>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span id="pointsDisplay" class="text-3xl font-black text-gray-900 tracking-tight font-mono">500</span>
+            <span class="text-xs font-extrabold text-[#D85A14] tracking-wider uppercase">POINTS</span>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1">
+            <span>Student:</span>
+            <code id="pointsStudentId" class="font-mono font-bold text-gray-800 bg-white px-1.5 py-0.5 rounded border border-gray-200">APT-2026-00417</code>
+          </p>
+        </div>
+
+        <!-- Quick Adjustment Buttons -->
+        <div class="space-y-3">
+          <div>
+            <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Quick Adjustments</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onclick="adjustPoints(100, 'Fee Payment Bonus')"
+                class="px-2 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#D85A14] border border-orange-200 text-xs font-bold transition text-center cursor-pointer active:scale-95"
+                title="Add 100 points for fee payment"
+              >
+                +100
+              </button>
+              <button
+                type="button"
+                onclick="adjustPoints(250, 'Course Milestone Award')"
+                class="px-2 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#D85A14] border border-orange-200 text-xs font-bold transition text-center cursor-pointer active:scale-95"
+                title="Add 250 points for course milestone"
+              >
+                +250
+              </button>
+              <button
+                type="button"
+                onclick="adjustPoints(500, 'Semester Excellence Reward')"
+                class="px-2 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#D85A14] border border-orange-200 text-xs font-bold transition text-center cursor-pointer active:scale-95"
+                title="Add 500 points for semester reward"
+              >
+                +500
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <button
+                type="button"
+                onclick="adjustPoints(-100, 'Manual Debit Simulation')"
+                class="px-2.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition text-center cursor-pointer active:scale-95"
+                title="Deduct 100 points"
+              >
+                -100 (Debit)
+              </button>
+              <button
+                type="button"
+                onclick="resetStudentPoints()"
+                class="px-2.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition text-center cursor-pointer active:scale-95"
+                title="Reset points back to 500"
+              >
+                Reset to 500
+              </button>
+            </div>
+          </div>
+
+          <!-- Set Custom Balance Form -->
+          <div class="pt-3 border-t border-gray-100">
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Set Custom Balance</label>
+            <div class="flex gap-2">
+              <input
+                id="customPointsInput"
+                type="number"
+                min="0"
+                placeholder="e.g. 1500"
+                class="w-full h-9 px-3 rounded-xl border border-gray-300 text-xs font-mono bg-gray-50 focus:bg-white focus:border-[#D85A14] outline-none"
+              />
+              <button
+                type="button"
+                onclick="setCustomBalance()"
+                class="px-4 h-9 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold cursor-pointer transition active:scale-95 shrink-0"
+              >
+                Set
+              </button>
+            </div>
+          </div>
+
+          <!-- Feedback notification toast -->
+          <div id="pointsFeedback" class="hidden text-[11px] font-semibold p-2.5 rounded-xl transition-all"></div>
         </div>
       </div>
 
@@ -316,7 +432,132 @@
           el.className = "text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between";
         }
       });
+
+      // Synchronize loyalty points for this persona
+      loadStudentPoints();
     }
+
+    // =========================================================================
+    // APTECH COIN MANAGEMENT LOGIC
+    // =========================================================================
+
+    function showFeedback(message, isError = false) {
+      const fb = document.getElementById("pointsFeedback");
+      fb.classList.remove("hidden", "bg-emerald-50", "text-emerald-800", "border-emerald-200", "bg-rose-50", "text-rose-800", "border-rose-200");
+      if (isError) {
+        fb.classList.add("bg-rose-50", "text-rose-800", "border", "border-rose-200");
+      } else {
+        fb.classList.add("bg-emerald-50", "text-emerald-800", "border", "border-emerald-200");
+      }
+      fb.innerText = message;
+      setTimeout(() => {
+        fb.classList.add("hidden");
+      }, 4000);
+    }
+
+    async function loadStudentPoints() {
+      const studentId = document.getElementById("inputStudentId")?.value.trim() || PERSONAS[currentPersona].studentId;
+      const pointsStudentIdEl = document.getElementById("pointsStudentId");
+      if (pointsStudentIdEl) pointsStudentIdEl.innerText = studentId;
+
+      try {
+        const res = await fetch(`/api/v1/coins/balance?studentId=${encodeURIComponent(studentId)}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          const balance = json.data.balance;
+          const displayEl = document.getElementById("pointsDisplay");
+          const badgeEl = document.getElementById("cardCoinsBadge");
+          if (displayEl) displayEl.innerText = balance.toLocaleString();
+          if (badgeEl) badgeEl.innerText = `${balance.toLocaleString()} PTS`;
+        }
+      } catch (err) {
+        console.error("Failed to load points balance:", err);
+      }
+    }
+
+    async function adjustPoints(delta, reason) {
+      const studentId = document.getElementById("inputStudentId")?.value.trim() || PERSONAS[currentPersona].studentId;
+      try {
+        const endpoint = delta > 0 ? "/api/v1/coins/credit" : "/api/v1/coins/debit";
+        const body = delta > 0
+          ? { studentId, amount: delta, reason }
+          : { studentId, amount: Math.abs(delta), reason };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          const newBal = json.data.remainingBalance ?? json.data.newBalance;
+          showFeedback(`${delta > 0 ? 'Added' : 'Deducted'} ${Math.abs(delta)} points. New Balance: ${newBal}`);
+          loadStudentPoints();
+        } else {
+          showFeedback(json.message || "Failed to adjust points", true);
+        }
+      } catch (err) {
+        console.error("Adjust points error:", err);
+        showFeedback("Error communicating with mock server", true);
+      }
+    }
+
+    async function setCustomBalance() {
+      const input = document.getElementById("customPointsInput");
+      const val = parseInt(input.value, 10);
+      if (isNaN(val) || val < 0) {
+        showFeedback("Please enter a valid non-negative number", true);
+        return;
+      }
+      const studentId = document.getElementById("inputStudentId")?.value.trim() || PERSONAS[currentPersona].studentId;
+
+      try {
+        const res = await fetch("/api/v1/coins/set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ studentId, balance: val })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showFeedback(`Balance updated to ${val} points!`);
+          input.value = "";
+          loadStudentPoints();
+        } else {
+          showFeedback(json.message || "Failed to set balance", true);
+        }
+      } catch (err) {
+        console.error("Set balance error:", err);
+        showFeedback("Error communicating with mock server", true);
+      }
+    }
+
+    async function resetStudentPoints() {
+      const studentId = document.getElementById("inputStudentId")?.value.trim() || PERSONAS[currentPersona].studentId;
+      try {
+        const res = await fetch("/api/v1/coins/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ studentId })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showFeedback(`Reset balance to 500 points!`);
+          loadStudentPoints();
+        }
+      } catch (err) {
+        console.error("Reset points error:", err);
+        showFeedback("Error resetting points", true);
+      }
+    }
+
+    // Attach studentId change listener
+    document.getElementById("inputStudentId")?.addEventListener("input", () => {
+      loadStudentPoints();
+    });
+
+    // Background polling (every 5s) to reflect external redemptions made via Hubble / TBX
+    setInterval(loadStudentPoints, 5000);
 
     async function launchSSORedirect() {
       const studentId = document.getElementById("inputStudentId").value.trim();
@@ -367,7 +608,7 @@
       }
     }
 
-    // Initialize with first persona
+    // Initialize with first persona and fetch points
     setPersona(0);
   </script>
 </body>

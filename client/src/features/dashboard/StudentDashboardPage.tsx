@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogoutMutation, useGetMeQuery } from "../auth/authApi";
+import { useGetHubbleLaunchUrlMutation, useGetHubbleHistoryQuery } from "./hubbleApi";
 import { Button } from "../../components/ui";
 import {
   DashboardHeader,
@@ -20,6 +21,25 @@ export const StudentDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [logoutMutation] = useLogoutMutation();
   const { data: meData } = useGetMeQuery();
+  const { data: hubbleHistoryData } = useGetHubbleHistoryQuery(undefined, {
+    pollingInterval: 15000,
+  });
+  const [getHubbleLaunchUrl] = useGetHubbleLaunchUrlMutation();
+
+  const handleRedeemVouchers = async () => {
+    try {
+      const res = await getHubbleLaunchUrl().unwrap();
+      if (res?.data?.launchUrl) {
+        window.open(res.data.launchUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+    } catch (err) {
+      console.warn("Hubble launch URL generation failed, falling back to staging SDK:", err);
+    }
+    // Fallback URL with clientId & light theme
+    const fallbackUrl = "https://sdk.dev.myhubble.money/?clientId=tbx-cards-loyalty-dev-sdk-fqlxyqb3&theme=light";
+    window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+  };
 
   const handleLogout = async () => {
     try {
@@ -121,7 +141,8 @@ export const StudentDashboardPage: React.FC = () => {
             {/* Rewards: Cashback, Loyalty Points, Redeem Vouchers */}
             <RewardStats
               cashback={MOCK_DASHBOARD_DATA.rewards.cashback}
-              loyaltyPoints={MOCK_DASHBOARD_DATA.rewards.loyaltyPoints}
+              loyaltyPoints={hubbleHistoryData?.data?.currentBalance ?? MOCK_DASHBOARD_DATA.rewards.loyaltyPoints}
+              onRedeemVouchers={handleRedeemVouchers}
             />
 
             {/* Card Controls: PIN & Toggles */}

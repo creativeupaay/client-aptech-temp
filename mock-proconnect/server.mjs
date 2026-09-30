@@ -21,11 +21,46 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-const server = http.createServer((req, res) => {
+// ============================================================================
+// Mock Aptech Coin Ledger & API Storage (Single Source of Truth at Aptech)
+// ============================================================================
+const studentCoins = new Map([
+  ["APT-2026-00417", 500],
+  ["APT-2026-01554", 500],
+  ["APT-2026-00892", 500],
+  ["APT-2026-LIVE01", 500],
+]);
+const DEFAULT_COIN_BALANCE = 500;
+
+function getStudentBalance(studentId) {
+  const sid = studentId || "APT-2026-01554";
+  if (!studentCoins.has(sid)) {
+    studentCoins.set(sid, DEFAULT_COIN_BALANCE);
+  }
+  return studentCoins.get(sid);
+}
+
+function parseJsonBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
+const server = http.createServer(async (req, res) => {
   // Allow cross-origin requests
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-TBX-Client-Id, X-TBX-Client-Secret, X-Hubble-Secret, X-HubbleSecret");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -33,8 +68,207 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Parse requested path
-  const urlPath = req.url ? req.url.split("?")[0] : "/";
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const urlPath = parsedUrl.pathname;
+
+  // ==========================================================================
+  // APTECH COIN API ENDPOINTS (MOCKED FOR DEVELOPMENT)
+  // ==========================================================================
+
+  // 1. GET /api/v1/coins/balance?studentId=...
+  if (urlPath === "/api/v1/coins/balance" && req.method === "GET") {
+    const studentId = parsedUrl.searchParams.get("studentId") || "APT-2026-01554";
+    const balance = getStudentBalance(studentId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: "Student loyalty points balance retrieved successfully from Aptech",
+        data: {
+          studentId,
+          balance,
+          currency: "POINTS",
+        },
+      })
+    );
+    return;
+  }
+
+  // 2. POST /api/v1/coins/debit
+  if (urlPath === "/api/v1/coins/debit" && req.method === "POST") {
+    const body = await parseJsonBody(req);
+    const studentId = body.studentId || "APT-2026-01554";
+    const amount = Number(body.amount ?? body.coins ?? 0);
+    const currentBalance = getStudentBalance(studentId);
+
+    if (isNaN(amount) || amount <= 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          statusCode: 400,
+          message: "Debit amount must be a positive number.",
+        })
+      );
+      return;
+    }
+
+    if (currentBalance < amount) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: false,
+          statusCode: 400,
+          message: `Insufficient loyalty points balance. Available: ${currentBalance}, Required: ${amount}.`,
+        })
+      );
+      return;
+    }
+
+    const remainingBalance = currentBalance - amount;
+    studentCoins.set(studentId, remainingBalance);
+    const transactionId = body.transactionId || `APTECH_TXN_${Date.now()}`;
+
+    console.log(`[APTECH COIN API] Debited ${amount} points for student ${studentId}. Remaining: ${remainingBalance}`);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: "Coins debited successfully from Aptech Coin Ledger",
+        data: {
+          studentId,
+          transactionId,
+          referenceId: body.referenceId || transactionId,
+          debitedAmount: amount,
+          remainingBalance,
+          currency: "POINTS",
+        },
+      })
+    );
+    return;
+  }
+
+  // 3. POST /api/v1/coins/reverse
+  if (urlPath === "/api/v1/coins/reverse" && req.method === "POST") {
+    const body = await parseJsonBody(req);
+    const studentId = body.studentId || "APT-2026-01554";
+    const amount = Number(body.amount ?? body.coins ?? 0);
+    const currentBalance = getStudentBalance(studentId);
+
+    const refundAmount = amount > 0 ? amount : 1;
+    const newBalance = currentBalance + refundAmount;
+    studentCoins.set(studentId, newBalance);
+
+    const transactionId = `APTECH_REV_${Date.now()}`;
+    console.log(`[APTECH COIN API] Reversed ${refundAmount} points for student ${studentId}. New Balance: ${newBalance}`);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: "Coins refunded/reversed successfully in Aptech Coin Ledger",
+        data: {
+          studentId,
+          transactionId,
+          originalTransactionId: body.originalTransactionId || body.referenceId,
+          refundedAmount: refundAmount,
+          newBalance,
+          currency: "POINTS",
+        },
+      })
+    );
+    return;
+  }
+
+  // 4. POST /api/v1/coins/credit (Award/Add points)
+  if (urlPath === "/api/v1/coins/credit" && req.method === "POST") {
+    const body = await parseJsonBody(req);
+    const studentId = body.studentId || "APT-2026-01554";
+    const amount = Number(body.amount ?? body.coins ?? 0);
+    const reason = body.reason || "Manual Credit / Course Reward";
+    const currentBalance = getStudentBalance(studentId);
+
+    if (isNaN(amount) || amount <= 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, statusCode: 400, message: "Credit amount must be positive." }));
+      return;
+    }
+
+    const newBalance = currentBalance + amount;
+    studentCoins.set(studentId, newBalance);
+    console.log(`[APTECH COIN API] Credited ${amount} points to student ${studentId} (${reason}). New Balance: ${newBalance}`);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: `Credited ${amount} points successfully`,
+        data: {
+          studentId,
+          creditedAmount: amount,
+          newBalance,
+          reason,
+          currency: "POINTS",
+        },
+      })
+    );
+    return;
+  }
+
+  // 5. POST /api/v1/coins/set (Set exact points balance)
+  if (urlPath === "/api/v1/coins/set" && req.method === "POST") {
+    const body = await parseJsonBody(req);
+    const studentId = body.studentId || "APT-2026-01554";
+    const balance = Number(body.balance ?? 0);
+
+    if (isNaN(balance) || balance < 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, statusCode: 400, message: "Balance must be a non-negative number." }));
+      return;
+    }
+
+    studentCoins.set(studentId, balance);
+    console.log(`[APTECH COIN API] Set balance for ${studentId} to ${balance}`);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: `Balance updated to ${balance} points`,
+        data: {
+          studentId,
+          balance,
+          currency: "POINTS",
+        },
+      })
+    );
+    return;
+  }
+
+  // 6. POST /api/v1/coins/reset
+  if (urlPath === "/api/v1/coins/reset") {
+    const body = req.method === "POST" ? await parseJsonBody(req) : {};
+    const studentId = body.studentId || parsedUrl.searchParams.get("studentId");
+    if (studentId) {
+      studentCoins.set(studentId, DEFAULT_COIN_BALANCE);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, message: `Reset ${studentId} balance to ${DEFAULT_COIN_BALANCE} points.` }));
+      return;
+    }
+    studentCoins.clear();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, message: "All student coin balances reset to default (500)." }));
+    return;
+  }
+
+  // Parse requested path for static file serving
   let filePath = path.join(__dirname, urlPath === "/" ? "index.html" : urlPath);
 
   // Security check: prevent directory traversal

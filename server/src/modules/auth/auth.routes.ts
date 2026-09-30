@@ -21,9 +21,11 @@ router.post("/login", validateRequest({ body: loginSchema }), AuthController.log
 router.post("/refresh", AuthController.refresh);
 router.post("/logout", AuthController.logout);
 
+import { ssoSimulateLimiter } from "../../middlewares/rateLimiter.middleware.js";
+
 // ProConnect SSO endpoints
 router.post("/sso/exchange", validateRequest({ body: ssoExchangeSchema }), AuthController.ssoExchange);
-router.post("/sso/simulate-code", validateRequest({ body: simulateSsoCodeSchema }), AuthController.simulateSsoCode);
+router.post("/sso/simulate-code", ssoSimulateLimiter, validateRequest({ body: simulateSsoCodeSchema }), AuthController.simulateSsoCode);
 
 // Protected auth endpoints
 router.get("/me", authenticate, AuthController.getMe);

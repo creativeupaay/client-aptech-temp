@@ -58,6 +58,28 @@ const envSchema = z.object({
   PROCONNECT_PROVIDER: z
     .enum(["mock", "http"])
     .default("mock"),
+  APTECH_COIN_API_URL: z
+    .string()
+    .default("http://localhost:5175/api/v1/coins"),
+  APTECH_COIN_PROVIDER: z
+    .enum(["mock", "http"])
+    .default("http"),
+  HUBBLE_CLIENT_ID: z
+    .string()
+    .default("tbx-cards-loyalty-dev-sdk-fqlxyqb3"),
+  HUBBLE_APP_SECRET: z
+    .string()
+    .default("R2ZHfNYjggU31wkDQ0L8haQKE1yvUz0G6md30FNKsRPsi4lWZNf3e41yRKbDGgWC"),
+  HUBBLE_SDK_BASE_URL: z
+    .string()
+    .default("https://sdk.dev.myhubble.money"),
+  HUBBLE_WEBHOOK_SECRET: z
+    .string()
+    .default("mock_hubble_secret_2026"),
+  HUBBLE_MOCK_SSO: z
+    .string()
+    .default("true")
+    .transform((val) => val === "true" || val === "1"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

@@ -52,7 +52,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   },
   rewards: {
     cashback: 42,
-    loyaltyPoints: 315,
+    loyaltyPoints: 500,
   },
   transactions: [
     {

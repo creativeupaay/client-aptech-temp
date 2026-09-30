@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { sendResponse } from "../../utils/apiResponse.js";
 
 import { authRoutes } from "../../modules/auth/index.js";
+import { hubbleRoutes } from "../../modules/hubble/index.js";
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.get("/status", (_req: Request, res: Response) => {
 
 // Feature module routes
 router.use("/auth", authRoutes);
+router.use("/hubble", hubbleRoutes);
 
 export default router;
 
