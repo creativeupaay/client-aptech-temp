@@ -11,6 +11,7 @@ import type {
 export class MockAptechCoinProvider implements IAptechCoinService {
   private static instance: MockAptechCoinProvider | null = null;
   private balances = new Map<string, number>();
+  private reversedTransactions = new Set<string>();
 
   public static getInstance(): MockAptechCoinProvider {
     if (!this.instance) {
@@ -21,6 +22,7 @@ export class MockAptechCoinProvider implements IAptechCoinService {
 
   public reset(initialBalances?: Record<string, number>): void {
     this.balances.clear();
+    this.reversedTransactions.clear();
     if (initialBalances) {
       for (const [k, v] of Object.entries(initialBalances)) {
         this.balances.set(k, v);
@@ -73,13 +75,30 @@ export class MockAptechCoinProvider implements IAptechCoinService {
   public async reverseDebit(input: AptechReverseInput): Promise<AptechReverseResult> {
     const current = this.getStudentBalance(input.studentId);
     const amount = input.amount && input.amount > 0 ? Number(input.amount) : 1;
+    const targetRef = input.originalTransactionId || input.transactionId;
+
+    if (targetRef && this.reversedTransactions.has(targetRef)) {
+      return {
+        studentId: input.studentId,
+        transactionId: `APTECH_REV_IDEM_${targetRef}`,
+        originalTransactionId: targetRef,
+        refundedAmount: 0,
+        newBalance: current,
+        currency: "POINTS",
+      };
+    }
+
+    if (targetRef) {
+      this.reversedTransactions.add(targetRef);
+    }
+
     const newBal = current + amount;
     this.balances.set(input.studentId, newBal);
 
     return {
       studentId: input.studentId,
       transactionId: input.transactionId || `APTECH_REV_${Date.now()}`,
-      originalTransactionId: input.originalTransactionId,
+      originalTransactionId: targetRef,
       refundedAmount: amount,
       newBalance: newBal,
       currency: "POINTS",

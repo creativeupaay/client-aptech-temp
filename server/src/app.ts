@@ -16,21 +16,37 @@ const allowedOrigins = [
   env.CLIENT_URL,
   "http://localhost:5175",
   "http://127.0.0.1:5175",
+  "https://sdk.dev.myhubble.money",
+  "https://dev.myhubble.money",
 ];
 
 // Cross-Origin Resource Sharing
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin === "https://myhubble.money" ||
+        origin.endsWith(".myhubble.money")
+      ) {
         callback(null, true);
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        callback(null, false);
       }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Hubble-Secret",
+      "x-hubble-secret",
+      "X-HubbleSecret",
+      "x-hubblesecret",
+      "X-TBX-Client-Id",
+      "X-TBX-Client-Secret",
+    ],
   })
 );
 

@@ -12,6 +12,7 @@ export function createInMemoryLimiter(options: Partial<Options> & { message?: st
     limit: options.limit || 30, // Default 30 requests per window
     standardHeaders: "draft-7", // Return standard RateLimit-* headers
     legacyHeaders: false, // Disable X-RateLimit-* headers
+    validate: { keyGeneratorIpFallback: false },
     skip: (req) => {
       // In automated tests, skip rate limiting unless specifically testing it
       if (process.env.NODE_ENV === "test" && !req.headers["x-test-rate-limit"]) {

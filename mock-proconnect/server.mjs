@@ -31,6 +31,7 @@ const studentCoins = new Map([
   ["APT-2026-LIVE01", 500],
 ]);
 const DEFAULT_COIN_BALANCE = 500;
+const reversedTransactions = new Set();
 
 function getStudentBalance(studentId) {
   const sid = studentId || "APT-2026-01554";
@@ -158,6 +159,32 @@ const server = http.createServer(async (req, res) => {
     const studentId = body.studentId || "APT-2026-01554";
     const amount = Number(body.amount ?? body.coins ?? 0);
     const currentBalance = getStudentBalance(studentId);
+    const targetRef = body.originalTransactionId || body.referenceId || body.transactionId;
+
+    if (targetRef && reversedTransactions.has(targetRef)) {
+      console.log(`[APTECH COIN API] Idempotent reversal requested for ${targetRef}. Returning current balance (${currentBalance}).`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          success: true,
+          statusCode: 200,
+          message: "Transaction already reversed (idempotent response)",
+          data: {
+            studentId,
+            transactionId: `APTECH_REV_IDEM_${targetRef}`,
+            originalTransactionId: targetRef,
+            refundedAmount: 0,
+            newBalance: currentBalance,
+            currency: "POINTS",
+          },
+        })
+      );
+      return;
+    }
+
+    if (targetRef) {
+      reversedTransactions.add(targetRef);
+    }
 
     const refundAmount = amount > 0 ? amount : 1;
     const newBalance = currentBalance + refundAmount;
@@ -175,7 +202,7 @@ const server = http.createServer(async (req, res) => {
         data: {
           studentId,
           transactionId,
-          originalTransactionId: body.originalTransactionId || body.referenceId,
+          originalTransactionId: targetRef,
           refundedAmount: refundAmount,
           newBalance,
           currency: "POINTS",
@@ -256,6 +283,7 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === "/api/v1/coins/reset") {
     const body = req.method === "POST" ? await parseJsonBody(req) : {};
     const studentId = body.studentId || parsedUrl.searchParams.get("studentId");
+    reversedTransactions.clear();
     if (studentId) {
       studentCoins.set(studentId, DEFAULT_COIN_BALANCE);
       res.writeHead(200, { "Content-Type": "application/json" });

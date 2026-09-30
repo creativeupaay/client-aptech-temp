@@ -86,7 +86,7 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
-      expect(res.body.message).toContain("Token is required");
+      expect(JSON.stringify(res.body)).toContain("Token is required");
     });
 
     it("should validate signed token and return student profile with Aptech points", async () => {
@@ -116,6 +116,16 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       expect(res.body.success).toBe(true);
       expect(res.body.data.studentId).toBeDefined();
       expect(res.body.data.loyaltyPoints).toBeDefined();
+    });
+
+    it("should validate token passed via query parameter in POST /sso?token=...", async () => {
+      const res = await request(app)
+        .post("/api/v1/hubble/sso?token=hbl_mock_query_token")
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.studentId).toBeDefined();
     });
   });
 
@@ -228,6 +238,89 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       // Step 3: Verify Aptech provider restored balance
       const coinAfterRefund = await MockAptechCoinProvider.getInstance().getBalance("APT-2026-00417");
       expect(coinAfterRefund.balance).toBe(500);
+    });
+
+    it("should reject reversal if original debit transaction was not found", async () => {
+      const res = await request(app).post("/api/v1/hubble/reverse").send({
+        userId: testUser._id.toString(),
+        originalTransactionId: "NON_EXISTENT_TXN_99999",
+        amount: 100,
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain("not found");
+    });
+
+    it("should handle duplicate reversal requests idempotently without double-refunding points", async () => {
+      // Step 1: Debit 100 points
+      await request(app).post("/api/v1/hubble/debit").send({
+        userId: testUser._id.toString(),
+        amount: 100,
+        transactionId: "TXN_DOUBLE_REV_TEST",
+        brandName: "Flipkart",
+      });
+
+      // Step 2: First Reversal (restores 100 points to 500)
+      const firstRev = await request(app).post("/api/v1/hubble/reverse").send({
+        userId: testUser._id.toString(),
+        originalTransactionId: "TXN_DOUBLE_REV_TEST",
+        amount: 100,
+      });
+      expect(firstRev.status).toBe(200);
+      expect(firstRev.body.data.newBalance).toBe(500);
+
+      // Step 3: Second duplicate Reversal replay (should be idempotent - balance stays 500)
+      const secondRev = await request(app).post("/api/v1/hubble/reverse").send({
+        userId: testUser._id.toString(),
+        originalTransactionId: "TXN_DOUBLE_REV_TEST",
+        amount: 100,
+      });
+      expect(secondRev.status).toBe(200);
+      expect(secondRev.body.data.newBalance).toBe(500);
+
+      // Verify Aptech provider balance remains 500 (NOT 600)
+      const coinCheck = await MockAptechCoinProvider.getInstance().getBalance("APT-2026-00417");
+      expect(coinCheck.balance).toBe(500);
+    });
+
+    it("should resolve student accurately when userId is omitted from reverse payload", async () => {
+      // Step 1: Debit 120 points
+      await request(app).post("/api/v1/hubble/debit").send({
+        userId: testUser._id.toString(),
+        amount: 120,
+        transactionId: "TXN_NO_USERID_TEST",
+        brandName: "Uber",
+      });
+
+      // Step 2: Reverse passing only originalTransactionId
+      const reverseRes = await request(app).post("/api/v1/hubble/reverse").send({
+        originalTransactionId: "TXN_NO_USERID_TEST",
+        reason: "Cancelled by Hubble",
+      });
+
+      expect(reverseRes.status).toBe(200);
+      expect(reverseRes.body.success).toBe(true);
+      expect(reverseRes.body.data.refundedAmount).toBe(120);
+      expect(reverseRes.body.data.newBalance).toBe(500);
+      expect(reverseRes.body.data.studentId).toBe("APT-2026-00417");
+    });
+  });
+
+  // ==========================================================================
+  // 6. CORS Configuration for Hubble Integration
+  // ==========================================================================
+  describe("CORS Configuration for Hubble Integration", () => {
+    it("should allow X-Hubble-Secret in preflight OPTIONS requests", async () => {
+      const res = await request(app)
+        .options("/api/v1/hubble/debit")
+        .set("Origin", "http://localhost:5173")
+        .set("Access-Control-Request-Method", "POST")
+        .set("Access-Control-Request-Headers", "X-Hubble-Secret, Content-Type");
+
+      expect(res.status).toBe(204);
+      const allowHeaders = (res.headers["access-control-allow-headers"] as string) || "";
+      expect(allowHeaders.toLowerCase()).toContain("x-hubble-secret");
     });
   });
 

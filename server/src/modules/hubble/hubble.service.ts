@@ -3,6 +3,7 @@ import { env } from "../../env.config.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { User, type IUserDocument } from "../user/user.model.js";
 import { VoucherRedemption } from "./voucherRedemption.model.js";
+import { DebitTransaction } from "./debitTransaction.model.js";
 import { AptechCoinFactory } from "../../services/aptech-coins/index.js";
 import type {
   BalanceQueryInput,
@@ -79,9 +80,9 @@ export class HubbleService {
    * If mock mode is enabled and no specific user matches, falls back to an active student or creates one.
    */
   public static async resolveUser(identifier?: {
-    token?: string;
-    userId?: string;
-    studentId?: string;
+    token?: string | null;
+    userId?: string | null;
+    studentId?: string | null;
   }): Promise<IUserDocument> {
     // 1. Try resolving via token if provided
     if (identifier?.token) {
@@ -246,14 +247,37 @@ export class HubbleService {
     const debitResult = await AptechCoinFactory.getProvider().debitCoins({
       studentId,
       amount,
-      transactionId: input.transactionId,
-      referenceId: input.referenceId || input.orderId,
-      brandName: input.brandName,
-      orderId: input.orderId,
+      transactionId: input.transactionId ?? undefined,
+      referenceId: (input.referenceId || input.orderId) ?? undefined,
+      brandName: input.brandName ?? undefined,
+      orderId: input.orderId ?? undefined,
     });
 
     const transactionId = debitResult.transactionId;
-    const referenceId = debitResult.referenceId || input.orderId || transactionId;
+    const referenceId = debitResult.referenceId || (input.orderId ?? undefined) || transactionId;
+
+    // Persist debit transaction record for audit and reversal idempotency
+    try {
+      await DebitTransaction.findOneAndUpdate(
+        { transactionId },
+        {
+          $setOnInsert: {
+            transactionId,
+            studentId,
+            userId: user._id,
+            amount: debitResult.debitedAmount,
+            remainingBalance: debitResult.remainingBalance,
+            status: "DEBITED",
+            orderId: input.orderId ?? undefined,
+            referenceId,
+            brandName: input.brandName ?? undefined,
+          },
+        },
+        { upsert: true, returnDocument: "after" }
+      );
+    } catch (err) {
+      console.warn(`[DebitTransaction] Could not save audit record for ${transactionId}:`, err);
+    }
 
     return {
       status: "SUCCESS",
@@ -272,23 +296,106 @@ export class HubbleService {
 
   /**
    * Reverse Debit API: Called by Hubble servers (POST /reverse) if voucher generation fails.
-   * Proxies reversal directly to Aptech Coin API without touching MongoDB ledger.
+   * Enforces original transaction verification and reversal idempotency.
    */
   public static async reverseDebit(input: ReverseDebitInput) {
-    const user = await this.resolveUser({ userId: input.userId, studentId: input.studentId });
-    const studentId = user.studentId || "APT-2026-00417";
-    const refundAmount = input.coins ? Number(input.coins) : (input.amount ? Number(input.amount) : 0);
+    const targetRef = input.originalTransactionId || input.referenceId || input.transactionId;
+    if (!targetRef) {
+      throw ApiError.badRequest("Transaction ID or reference ID is required for reversal.");
+    }
 
-    const targetRef = input.referenceId || input.transactionId || input.originalTransactionId;
+    // Verify whether this transaction was actually debited before
+    const existingDebit = await DebitTransaction.findOne({
+      $or: [
+        { transactionId: targetRef },
+        { referenceId: targetRef },
+        { orderId: targetRef },
+      ],
+    });
+
+    // 1. Idempotency Guard: If transaction is ALREADY reversed, return previous success idempotently
+    if (existingDebit && existingDebit.status === "REVERSED") {
+      const studentId = existingDebit.studentId || "APT-2026-00417";
+      const currentBalanceData = await AptechCoinFactory.getProvider().getBalance(studentId);
+      return {
+        status: "SUCCESS",
+        transactionId: existingDebit.reversalTransactionId || `REV_IDEM_${existingDebit.transactionId}`,
+        referenceId: targetRef,
+        originalTransactionId: existingDebit.transactionId,
+        totalCoins: currentBalanceData.balance,
+        coins: currentBalanceData.balance,
+        refundedCoins: existingDebit.amount,
+        refundedAmount: existingDebit.amount,
+        newBalance: currentBalanceData.balance,
+        balance: currentBalanceData.balance,
+        remainingBalance: currentBalanceData.balance,
+        userId: existingDebit.userId?.toString() || "",
+        studentId,
+        isIdempotent: true,
+      };
+    }
+
+    // 2. Debit Existence Check: Reject unknown / phantom reversals
+    if (!existingDebit) {
+      throw ApiError.badRequest(`Original debit transaction '${targetRef}' not found.`);
+    }
+
+    const user = await this.resolveUser({
+      userId: input.userId || existingDebit.userId?.toString(),
+      studentId: input.studentId || existingDebit.studentId,
+    });
+    const studentId = existingDebit.studentId || user.studentId || "APT-2026-00417";
+    const refundAmount = input.coins ? Number(input.coins) : (input.amount ? Number(input.amount) : 0);
+    const actualRefundAmount = existingDebit.amount || (refundAmount > 0 ? refundAmount : 1);
+
+    // Atomically transition status from DEBITED to REVERSED to avoid concurrent double refunds
+    const lockedDebit = await DebitTransaction.findOneAndUpdate(
+      {
+        _id: existingDebit._id,
+        status: "DEBITED",
+      },
+      {
+        $set: {
+          status: "REVERSED",
+          reversedAt: new Date(),
+          reversalReason: input.reason || input.note,
+        },
+      },
+      { returnDocument: "after" }
+    );
+
+    if (!lockedDebit) {
+      // Was reversed by a concurrent request at the same instant
+      const currentBalanceData = await AptechCoinFactory.getProvider().getBalance(studentId);
+      return {
+        status: "SUCCESS",
+        transactionId: existingDebit.reversalTransactionId || `REV_IDEM_${existingDebit.transactionId}`,
+        referenceId: targetRef,
+        originalTransactionId: existingDebit.transactionId,
+        totalCoins: currentBalanceData.balance,
+        coins: currentBalanceData.balance,
+        refundedCoins: existingDebit.amount,
+        refundedAmount: existingDebit.amount,
+        newBalance: currentBalanceData.balance,
+        balance: currentBalanceData.balance,
+        remainingBalance: currentBalanceData.balance,
+        userId: user._id.toString(),
+        studentId,
+        isIdempotent: true,
+      };
+    }
 
     // Proxy reverse to Aptech Coin API
     const reverseResult = await AptechCoinFactory.getProvider().reverseDebit({
       studentId,
-      amount: refundAmount,
-      transactionId: input.transactionId,
+      amount: actualRefundAmount,
+      transactionId: input.transactionId ?? undefined,
       originalTransactionId: targetRef,
-      reason: input.reason || input.note,
+      reason: (input.reason || input.note) ?? undefined,
     });
+
+    lockedDebit.reversalTransactionId = reverseResult.transactionId;
+    await lockedDebit.save();
 
     return {
       status: "SUCCESS",
@@ -301,6 +408,7 @@ export class HubbleService {
       refundedAmount: reverseResult.refundedAmount,
       newBalance: reverseResult.newBalance,
       balance: reverseResult.newBalance,
+      remainingBalance: reverseResult.newBalance,
       userId: user._id.toString(),
       studentId,
     };
@@ -310,7 +418,10 @@ export class HubbleService {
    * Records a fulfilled voucher from Hubble webhook into student's redemption history.
    */
   public static async recordFulfilledVoucher(data: WebhookTransactionInput) {
-    const user = await this.resolveUser({ userId: data.userId, studentId: data.studentId });
+    const user = await this.resolveUser({
+      userId: data.userId ?? undefined,
+      studentId: data.studentId ?? undefined,
+    });
 
     const voucher = await VoucherRedemption.findOneAndUpdate(
       { orderId: data.orderId },
@@ -318,15 +429,15 @@ export class HubbleService {
         $set: {
           userId: user._id,
           studentId: user.studentId,
-          brandName: data.brandName,
-          voucherCode: data.voucherCode,
-          pin: data.pin,
-          denomination: data.denomination,
-          pointsDebited: data.pointsDebited,
-          expiryDate: data.expiryDate,
-          redemptionUrl: data.redemptionUrl,
-          status: data.status,
-          transactionId: data.transactionId,
+          brandName: data.brandName ?? "Brand Gift Card",
+          voucherCode: data.voucherCode ?? undefined,
+          pin: data.pin ?? undefined,
+          denomination: data.denomination ?? 100,
+          pointsDebited: data.pointsDebited ?? 100,
+          expiryDate: data.expiryDate ?? undefined,
+          redemptionUrl: data.redemptionUrl ?? undefined,
+          status: data.status ?? "ACTIVE",
+          transactionId: data.transactionId ?? undefined,
         },
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

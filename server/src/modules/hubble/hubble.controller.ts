@@ -16,15 +16,19 @@ export class HubbleController {
     }
 
     const incomingSecret =
-      (req.headers["x-hubble-secret"] as string) || (req.headers["x-hubblesecret"] as string);
+      ((req.headers["x-hubble-secret"] as string) || (req.headers["x-hubblesecret"] as string))?.trim();
 
-    // If configured and not mock, verify
+    // If configured and not mock, verify against HUBBLE_WEBHOOK_SECRET or HUBBLE_APP_SECRET
     if (
       env.HUBBLE_WEBHOOK_SECRET &&
       env.HUBBLE_WEBHOOK_SECRET !== "mock_hubble_secret_2026" &&
       !env.HUBBLE_MOCK_SSO
     ) {
-      if (incomingSecret !== env.HUBBLE_WEBHOOK_SECRET) {
+      const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
+      if (env.HUBBLE_APP_SECRET?.trim()) {
+        validSecrets.push(env.HUBBLE_APP_SECRET.trim());
+      }
+      if (!incomingSecret || !validSecrets.includes(incomingSecret)) {
         throw ApiError.unauthorized("Invalid X-Hubble-Secret header provided.");
       }
     }

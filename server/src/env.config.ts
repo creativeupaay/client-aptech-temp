@@ -66,10 +66,10 @@ const envSchema = z.object({
     .default("http"),
   HUBBLE_CLIENT_ID: z
     .string()
-    .default("tbx-cards-loyalty-dev-sdk-fqlxyqb3"),
+    .default(process.env.HUBBLE_CLIENT_ID || "tbx-cards-loyalty-dev-sdk-fqlxyqb3"),
   HUBBLE_APP_SECRET: z
     .string()
-    .default("R2ZHfNYjggU31wkDQ0L8haQKE1yvUz0G6md30FNKsRPsi4lWZNf3e41yRKbDGgWC"),
+    .default(process.env.HUBBLE_APP_SECRET || (process.env.NODE_ENV === "test" ? "mock_hubble_test_secret" : "")),
   HUBBLE_SDK_BASE_URL: z
     .string()
     .default("https://sdk.dev.myhubble.money"),
