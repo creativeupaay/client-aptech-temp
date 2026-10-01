@@ -57,7 +57,20 @@ export const webhookTransactionSchema = z
     pointsDebited: z.coerce.number().positive().nullable().optional().default(100),
     expiryDate: z.string().nullable().optional(),
     redemptionUrl: z.string().nullable().optional(),
-    status: z.enum(["ACTIVE", "USED", "EXPIRED", "CANCELLED"]).nullable().optional().default("ACTIVE"),
+    status: z
+      .enum([
+        "ACTIVE",
+        "SUCCESS",
+        "COMPLETED",
+        "PENDING",
+        "FAILED",
+        "USED",
+        "EXPIRED",
+        "CANCELLED",
+      ])
+      .nullable()
+      .optional()
+      .default("ACTIVE"),
     transactionId: z.string().nullable().optional(),
   })
   .passthrough();

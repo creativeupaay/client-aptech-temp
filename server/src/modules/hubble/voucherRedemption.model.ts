@@ -1,6 +1,15 @@
 import mongoose, { type Document, type Model, Schema, type Types } from "mongoose";
 
-export const VOUCHER_STATUSES = ["ACTIVE", "USED", "EXPIRED", "CANCELLED"] as const;
+export const VOUCHER_STATUSES = [
+  "ACTIVE",
+  "SUCCESS",
+  "COMPLETED",
+  "PENDING",
+  "FAILED",
+  "USED",
+  "EXPIRED",
+  "CANCELLED",
+] as const;
 export type VoucherStatus = (typeof VOUCHER_STATUSES)[number];
 
 export interface IVoucherRedemption {

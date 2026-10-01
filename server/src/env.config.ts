@@ -35,6 +35,10 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z
     .string()
     .default("7d"),
+  ENCRYPTION_KEY: z
+    .string()
+    .min(16, "ENCRYPTION_KEY must be at least 16 characters")
+    .default(process.env.ENCRYPTION_KEY || "tbx_data_encryption_vault_key_2026"),
 
   OTP_EXPIRY_MINUTES: z
     .string()

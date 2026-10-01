@@ -9,6 +9,9 @@ import { errorHandler } from "./middlewares/error.middleware.js";
 
 const app: Application = express();
 
+// Enable trust proxy for ngrok, reverse proxies, and load balancers
+app.set("trust proxy", 1);
+
 // Security HTTP headers
 app.use(helmet());
 

@@ -22,6 +22,7 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
       const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(5000),
       });
 
       const json = await res.json() as {
@@ -41,6 +42,9 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
       };
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw ApiError.gatewayTimeout("Aptech Coin API balance check timed out after 5000ms.");
+      }
       throw ApiError.badGateway(`Aptech Coin API balance check failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -52,6 +56,7 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        signal: AbortSignal.timeout(5000),
       });
 
       const json = await res.json() as {
@@ -84,6 +89,9 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
       };
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw ApiError.gatewayTimeout("Aptech Coin API debit timed out after 5000ms.");
+      }
       throw ApiError.badGateway(`Aptech Coin API debit failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -95,6 +103,7 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        signal: AbortSignal.timeout(5000),
       });
 
       const json = await res.json() as {
@@ -124,6 +133,9 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
       };
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw ApiError.gatewayTimeout("Aptech Coin API reverse timed out after 5000ms.");
+      }
       throw ApiError.badGateway(`Aptech Coin API reverse failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }

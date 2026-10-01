@@ -25,20 +25,26 @@ export const StudentDashboardPage: React.FC = () => {
     pollingInterval: 15000,
   });
   const [getHubbleLaunchUrl] = useGetHubbleLaunchUrlMutation();
+  const [launchError, setLaunchError] = React.useState<string | null>(null);
+  const [isLaunching, setIsLaunching] = React.useState(false);
 
   const handleRedeemVouchers = async () => {
+    if (isLaunching) return;
+    setLaunchError(null);
+    setIsLaunching(true);
     try {
       const res = await getHubbleLaunchUrl().unwrap();
       if (res?.data?.launchUrl) {
         window.open(res.data.launchUrl, "_blank", "noopener,noreferrer");
         return;
       }
+      throw new Error("Missing launch URL in server response.");
     } catch (err) {
-      console.warn("Hubble launch URL generation failed, falling back to staging SDK:", err);
+      console.error("Hubble launch URL generation failed:", err);
+      setLaunchError("Unable to open Voucher Marketplace. Please verify your connection or try again later.");
+    } finally {
+      setIsLaunching(false);
     }
-    // Fallback URL with clientId & light theme
-    const fallbackUrl = "https://sdk.dev.myhubble.money/?clientId=tbx-cards-loyalty-dev-sdk-fqlxyqb3&theme=light";
-    window.open(fallbackUrl, "_blank", "noopener,noreferrer");
   };
 
   const handleLogout = async () => {
@@ -139,6 +145,19 @@ export const StudentDashboardPage: React.FC = () => {
             <KycBanner />
 
             {/* Rewards: Cashback, Loyalty Points, Redeem Vouchers */}
+            {launchError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center justify-between shadow-2xs">
+                <span>{launchError}</span>
+                <button
+                  type="button"
+                  onClick={() => setLaunchError(null)}
+                  className="text-red-400 hover:text-red-700 font-bold ml-2 transition-colors cursor-pointer"
+                  aria-label="Dismiss error"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             <RewardStats
               cashback={MOCK_DASHBOARD_DATA.rewards.cashback}
               loyaltyPoints={hubbleHistoryData?.data?.currentBalance ?? MOCK_DASHBOARD_DATA.rewards.loyaltyPoints}

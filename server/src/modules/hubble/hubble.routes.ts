@@ -18,7 +18,7 @@ import {
 const router = Router();
 
 // Base Integration status endpoint (for base URL verification)
-router.all("/", (_req, res) => {
+router.get("/", (_req, res) => {
   res.status(200).json({
     status: "SUCCESS",
     success: true,
@@ -32,6 +32,29 @@ router.all("/", (_req, res) => {
     },
   });
 });
+
+// Hubble Client Configuration SSO (supports POST directly to Base URL /api/v1/hubble)
+router.post(
+  "/",
+  hubbleCallbackLimiter,
+  (req, res, next) => {
+    if (req.body?.token || req.query?.token) {
+      return HubbleController.classicSso(req, res);
+    }
+    return res.status(200).json({
+      status: "SUCCESS",
+      success: true,
+      message: "Hubble Money Integration Base API operational",
+      endpoints: {
+        sso: "/api/v1/hubble/sso",
+        balance: "/api/v1/hubble/balance",
+        debit: "/api/v1/hubble/debit",
+        reverse: "/api/v1/hubble/reverse",
+        webhook: "/api/v1/hubble/webhook/transaction-status",
+      },
+    });
+  }
+);
 
 // Student-facing authenticated endpoints (AP-Tech Client)
 // Protected by JWT + In-Memory Rate Limiter (No Redis required)

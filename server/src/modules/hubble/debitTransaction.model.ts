@@ -1,6 +1,6 @@
 import mongoose, { type Document, type Model, Schema, type Types } from "mongoose";
 
-export const DEBIT_TRANSACTION_STATUSES = ["DEBITED", "REVERSED"] as const;
+export const DEBIT_TRANSACTION_STATUSES = ["DEBITED", "REVERSAL_PENDING", "REVERSED"] as const;
 export type DebitTransactionStatus = (typeof DEBIT_TRANSACTION_STATUSES)[number];
 
 export interface IDebitTransaction {
@@ -65,6 +65,7 @@ const debitTransactionSchema = new Schema<IDebitTransactionDocument>(
     referenceId: {
       type: String,
       trim: true,
+      index: true,
     },
     brandName: {
       type: String,

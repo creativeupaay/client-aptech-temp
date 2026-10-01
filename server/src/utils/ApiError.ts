@@ -46,6 +46,10 @@ export class ApiError extends Error {
     return new ApiError(502, message);
   }
 
+  static gatewayTimeout(message = "Gateway Timeout"): ApiError {
+    return new ApiError(504, message);
+  }
+
   static internal(message = "Internal Server Error"): ApiError {
     return new ApiError(500, message, undefined, false);
   }

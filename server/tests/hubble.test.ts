@@ -5,6 +5,7 @@ import app from "../src/app.js";
 import { User, type IUserDocument } from "../src/modules/user/user.model.js";
 import { VoucherRedemption } from "../src/modules/hubble/voucherRedemption.model.js";
 import { MockAptechCoinProvider } from "../src/services/aptech-coins/index.js";
+import { decryptSensitive } from "../src/utils/crypto.js";
 import { env } from "../src/env.config.js";
 
 describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => {
@@ -127,6 +128,16 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       expect(res.body.success).toBe(true);
       expect(res.body.data.studentId).toBeDefined();
     });
+
+    it("should reject tampered or invalid JWT tokens with 401 Unauthorized", async () => {
+      const res = await request(app)
+        .post("/api/v1/hubble/sso")
+        .send({ token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid_tampered_payload.signature" });
+
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain("Invalid or expired session token");
+    });
   });
 
   // ==========================================================================
@@ -203,6 +214,32 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
+    });
+
+    it("should handle duplicate debit calls idempotently without double-debiting points", async () => {
+      const debitPayload = {
+        userId: testUser._id.toString(),
+        amount: 100,
+        transactionId: "TXN_IDEM_DEBIT_TEST",
+        orderId: "ORD_IDEM_1001",
+        brandName: "Myntra",
+      };
+
+      // Call 1
+      const res1 = await request(app).post("/api/v1/hubble/debit").send(debitPayload);
+      expect(res1.status).toBe(200);
+      expect(res1.body.data.debitedAmount).toBe(100);
+      expect(res1.body.data.remainingBalance).toBe(400);
+
+      // Call 2 (Duplicate replay)
+      const res2 = await request(app).post("/api/v1/hubble/debit").send(debitPayload);
+      expect(res2.status).toBe(200);
+      expect(res2.body.data.isIdempotent).toBe(true);
+      expect(res2.body.data.remainingBalance).toBe(400);
+
+      // Verify points in provider: debited only once (500 - 100 = 400, NOT 300)
+      const coinCheck = await MockAptechCoinProvider.getInstance().getBalance("APT-2026-00417");
+      expect(coinCheck.balance).toBe(400);
     });
   });
 
@@ -351,11 +388,37 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       expect(res.body.success).toBe(true);
       expect(res.body.data.orderId).toBe("HBL_ORD_991823");
 
-      // Verify saved in VoucherRedemption collection in DB
+      // Verify saved in VoucherRedemption collection in DB is encrypted at rest (Item 7)
       const savedVoucher = await VoucherRedemption.findOne({ orderId: "HBL_ORD_991823" });
       expect(savedVoucher).not.toBeNull();
-      expect(savedVoucher?.voucherCode).toBe("IKEA-GIFT-8891-9920");
-      expect(savedVoucher?.pin).toBe("4491");
+      expect(savedVoucher?.voucherCode?.startsWith("enc:v1:")).toBe(true);
+      expect(savedVoucher?.pin?.startsWith("enc:v1:")).toBe(true);
+
+      // Verify decrypted values match original plain text
+      expect(decryptSensitive(savedVoucher?.voucherCode || "")).toBe("IKEA-GIFT-8891-9920");
+      expect(decryptSensitive(savedVoucher?.pin || "")).toBe("4491");
+    });
+
+    it("should accept payment gateway statuses like SUCCESS and normalize to ACTIVE (Item 11)", async () => {
+      const webhookPayload = {
+        orderId: "HBL_ORD_GATEWAY_SUCCESS_01",
+        userId: testUser._id.toString(),
+        brandName: "Flipkart",
+        voucherCode: "FLIP-GIFT-2026",
+        pin: "9876",
+        status: "SUCCESS", // Payment gateway status
+      };
+
+      const res = await request(app)
+        .post("/api/v1/hubble/webhook/transaction-status")
+        .send(webhookPayload);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const savedVoucher = await VoucherRedemption.findOne({ orderId: "HBL_ORD_GATEWAY_SUCCESS_01" });
+      expect(savedVoucher).not.toBeNull();
+      expect(savedVoucher?.status).toBe("ACTIVE");
     });
   });
 
@@ -363,7 +426,7 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
   // 7. Student History Endpoint
   // ==========================================================================
   describe("GET /api/v1/hubble/history", () => {
-    it("should return student redemption history and live balance from Aptech", async () => {
+    it("should return student redemption history and live balance from Aptech with decrypted vouchers", async () => {
       const res = await request(app)
         .get("/api/v1/hubble/history")
         .set("Authorization", `Bearer ${testAuthToken}`);
@@ -372,6 +435,12 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       expect(res.body.success).toBe(true);
       expect(res.body.data.currentBalance).toBe(500);
       expect(Array.isArray(res.body.data.vouchers)).toBe(true);
+
+      if (res.body.data.vouchers.length > 0) {
+        const voucher = res.body.data.vouchers[0];
+        // Decrypted and readable by authenticated student
+        expect(voucher.voucherCode).not.toContain("enc:v1:");
+      }
     });
   });
 });

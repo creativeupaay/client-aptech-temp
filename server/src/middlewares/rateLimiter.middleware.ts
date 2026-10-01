@@ -65,12 +65,19 @@ export const hubbleHistoryLimiter = createInMemoryLimiter({
 /**
  * 3. Hubble Cloud Callback Limiter:
  * Protects /api/v1/hubble/balance, /debit, /reverse, /sso
- * Max 120 requests per minute per IP / Hubble client.
+ * Keys on partner identity when signed with X-Hubble-Secret with 1200 req/min (20 req/sec)
+ * capacity to accommodate high-volume bursts from shared Hubble egress proxies.
  */
 export const hubbleCallbackLimiter = createInMemoryLimiter({
   windowMs: 60 * 1000,
-  limit: 120,
-  keyGenerator: (req) => req.ip || "hubble_cloud",
+  limit: 1200,
+  keyGenerator: (req) => {
+    const hasSecret = req.headers["x-hubble-secret"] || req.headers["x-hubblesecret"];
+    if (hasSecret) {
+      return "partner_hubble_cloud";
+    }
+    return `unauth_ip_${req.ip || req.socket.remoteAddress || "anonymous"}`;
+  },
   message: "Hubble integration rate limit exceeded. Please retry after a brief pause.",
 });
 

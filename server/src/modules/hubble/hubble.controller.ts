@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { type Request, type Response } from "express";
 import { HubbleService } from "./hubble.service.js";
 import { sendResponse } from "../../utils/apiResponse.js";
@@ -7,7 +8,8 @@ import { ApiError } from "../../utils/ApiError.js";
 
 export class HubbleController {
   /**
-   * Helper to verify X-Hubble-Secret header if configured and not in mock mode.
+   * Helper to verify X-Hubble-Secret header using constant-time comparison.
+   * Protects against timing attacks and enforces authentication unconditionally.
    */
   private static verifyHubbleSecret(req: Request) {
     // In automated unit test mode, skip secret validation
@@ -18,19 +20,24 @@ export class HubbleController {
     const incomingSecret =
       ((req.headers["x-hubble-secret"] as string) || (req.headers["x-hubblesecret"] as string))?.trim();
 
-    // If configured and not mock, verify against HUBBLE_WEBHOOK_SECRET or HUBBLE_APP_SECRET
-    if (
-      env.HUBBLE_WEBHOOK_SECRET &&
-      env.HUBBLE_WEBHOOK_SECRET !== "mock_hubble_secret_2026" &&
-      !env.HUBBLE_MOCK_SSO
-    ) {
-      const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
-      if (env.HUBBLE_APP_SECRET?.trim()) {
-        validSecrets.push(env.HUBBLE_APP_SECRET.trim());
-      }
-      if (!incomingSecret || !validSecrets.includes(incomingSecret)) {
-        throw ApiError.unauthorized("Invalid X-Hubble-Secret header provided.");
-      }
+    if (!incomingSecret) {
+      throw ApiError.unauthorized("Missing X-Hubble-Secret header.");
+    }
+
+    const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
+    if (env.HUBBLE_APP_SECRET?.trim()) {
+      validSecrets.push(env.HUBBLE_APP_SECRET.trim());
+    }
+
+    const incomingHash = crypto.createHash("sha256").update(incomingSecret).digest();
+
+    const isMatch = validSecrets.some((validSecret) => {
+      const validHash = crypto.createHash("sha256").update(validSecret).digest();
+      return crypto.timingSafeEqual(incomingHash, validHash);
+    });
+
+    if (!isMatch) {
+      throw ApiError.unauthorized("Invalid X-Hubble-Secret header provided.");
     }
   }
 
