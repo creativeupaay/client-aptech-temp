@@ -5,6 +5,7 @@ import {
   rupayPrepaidLogo,
 } from "../../../assets/dashboard";
 import { Button } from "../../../components/ui";
+import { CardSdkViewerModal } from "../../card/components/CardSdkViewerModal";
 
 interface CardSectionProps {
   holderName?: string;
@@ -90,17 +91,19 @@ const ContactlessWaves: React.FC = () => (
 
 export const CardSection: React.FC<CardSectionProps> = ({
   holderName = "Aarav Sharma",
-  cardNumber = "6521  8920  3411  8942",
-  maskedPan,
-  expiry = "08/29",
-  cvv = "842",
+  cardNumber,
+  maskedPan = "•••• •••• •••• 8942",
+  expiry = "••/••",
   onViewDetails,
 }) => {
-  const [showDetails, setShowDetails] = useState(false);
+  const [isSdkModalOpen, setIsSdkModalOpen] = useState(false);
 
   const handleToggleDetails = () => {
-    setShowDetails((prev) => !prev);
-    onViewDetails?.();
+    if (onViewDetails) {
+      onViewDetails();
+      return;
+    }
+    setIsSdkModalOpen(true);
   };
 
   return (
@@ -152,26 +155,11 @@ export const CardSection: React.FC<CardSectionProps> = ({
             <ContactlessWaves />
           </div>
 
-          {/* Card Number: 4 groups of 4 dots or unmasked PAN */}
+          {/* Card Number: Masked PAN */}
           <div className="mt-2.5">
-            {showDetails ? (
-              <div className="font-mono text-base sm:text-lg font-bold tracking-[0.16em] sm:tracking-[0.2em] text-white drop-shadow-xs select-all">
-                {cardNumber || maskedPan || "6521  8920  3411  8942"}
-              </div>
-            ) : (
-              <div className="flex items-center gap-4 sm:gap-6 py-1 select-none">
-                {[0, 1, 2, 3].map((groupIndex) => (
-                  <div key={groupIndex} className="flex items-center gap-1.5 sm:gap-2">
-                    {[0, 1, 2, 3].map((dotIndex) => (
-                      <span
-                        key={dotIndex}
-                        className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white block shadow-xs"
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="font-mono text-base sm:text-lg font-bold tracking-[0.16em] sm:tracking-[0.2em] text-white drop-shadow-xs">
+              {maskedPan || cardNumber || "•••• •••• •••• 8942"}
+            </div>
           </div>
         </div>
 
@@ -184,7 +172,7 @@ export const CardSection: React.FC<CardSectionProps> = ({
                 Expiry
               </span>
               <span className="font-mono font-bold tracking-widest text-xs sm:text-sm drop-shadow-xs">
-                {showDetails ? expiry : "••/••"}
+                {expiry || "••/••"}
               </span>
             </div>
 
@@ -194,7 +182,7 @@ export const CardSection: React.FC<CardSectionProps> = ({
                 CVV
               </span>
               <span className="font-mono font-bold tracking-widest text-xs sm:text-sm drop-shadow-xs">
-                {showDetails ? cvv : "•••"}
+                •••
               </span>
             </div>
           </div>
@@ -215,8 +203,16 @@ export const CardSection: React.FC<CardSectionProps> = ({
         onClick={handleToggleDetails}
         className="w-full h-[40px] text-xs sm:text-sm font-semibold rounded-lg text-center shadow-2xs"
       >
-        {showDetails ? "Hide Card Details" : "View Card Details"}
+        View Card Details
       </Button>
+
+      {/* PCI-DSS Scoped Card SDK Modal */}
+      <CardSdkViewerModal
+        isOpen={isSdkModalOpen}
+        onClose={() => setIsSdkModalOpen(false)}
+        maskedPan={maskedPan || cardNumber || "•••• •••• •••• 8942"}
+        holderName={holderName}
+      />
     </div>
   );
 };

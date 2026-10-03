@@ -8,6 +8,7 @@ import { User, type IUserDocument } from "../user/user.model.js";
 import { Card } from "../card/card.model.js";
 import { OtpService } from "../otp/otp.service.js";
 import { ProconnectFactory, type ProconnectStudentProfile } from "../../services/proconnect/index.js";
+import { AptrackFactory } from "../../services/aptrack/index.js";
 import {
   type SignupInput,
   type VerifyOtpInput,
@@ -109,6 +110,7 @@ export class AuthService {
       existingUser.name = data.name;
       existingUser.email = data.email;
       existingUser.highestEducation = data.highestEducation;
+      if (data.city) existingUser.city = data.city;
       existingUser.passwordHash = passwordHash;
       user = await existingUser.save();
     } else {
@@ -118,6 +120,7 @@ export class AuthService {
         email: data.email,
         mobile: data.mobile,
         highestEducation: data.highestEducation,
+        city: data.city,
         passwordHash,
         isMobileVerified: false,
         status: "pending_verification",
@@ -172,6 +175,22 @@ export class AuthService {
 
     // Generate Access & Refresh tokens
     const tokens = this.generateTokens(user);
+
+    // Push prospect lead to ApTrack CRM (Milestone 7 of Functional Spec)
+    if (user.userType === "non_aptech_student") {
+      AptrackFactory.getProvider()
+        .createProspectLead({
+          leadType: "PROSPECT_STUDENT",
+          name: user.name,
+          mobile: user.mobile,
+          email: user.email,
+          highestEducation: user.highestEducation,
+          city: user.city,
+          channel: "WEB_PORTAL",
+          cardStatus: card.status,
+        })
+        .catch((err) => console.warn("[APTRACK] Non-blocking lead sync error:", err));
+    }
 
     return {
       message: "Mobile verified successfully. Welcome to Aptech Student Card dashboard!",

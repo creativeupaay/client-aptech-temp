@@ -111,6 +111,12 @@ export const GeneratePinModal: React.FC<GeneratePinModalProps> = ({
               <p className="text-[13px] text-[#737380] mt-1.5 leading-snug px-2">
                 Choose a secure PIN for your card. You will use this PIN for ATM withdrawals and payments.
               </p>
+              {/* PCI-DSS Security Badge */}
+              <div className="flex items-center justify-center gap-1.5 mt-2.5 py-1 px-2.5 rounded-full bg-emerald-50 text-[11px] font-semibold text-emerald-700 mx-auto w-fit">
+                <span>🔒 PCI-DSS Compliant</span>
+                <span className="text-emerald-400">•</span>
+                <span>Oxymoney Card SDK Session</span>
+              </div>
             </div>
 
             {/* Error banner if any */}
@@ -152,6 +158,14 @@ export const GeneratePinModal: React.FC<GeneratePinModalProps> = ({
                   className="w-full h-[46px] px-3.5 rounded-[10px] border border-[#E8E8EB] bg-white text-sm text-[#1C1C21] placeholder-[#A1A1AA] focus:outline-none focus:border-[#DB6516] focus:ring-1 focus:ring-[#DB6516] transition-colors"
                 />
               </div>
+            </div>
+
+            {/* PCI-DSS Security Badge */}
+            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center gap-2 text-[11px] text-gray-600">
+              <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span>PCI-DSS Compliant: PIN encrypted directly to RuPay issuer core.</span>
             </div>
 
             {/* Action Buttons: Cancel and Continue */}

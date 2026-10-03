@@ -43,6 +43,8 @@ app.use(
     allowedHeaders: [
       "Content-Type",
       "Authorization",
+      "Idempotency-Key",
+      "idempotency-key",
       "X-Hubble-Secret",
       "x-hubble-secret",
       "X-HubbleSecret",

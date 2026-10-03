@@ -84,6 +84,62 @@ const envSchema = z.object({
     .string()
     .default("true")
     .transform((val) => val === "true" || val === "1"),
+
+  // TransBnk Banking Gateway Configuration
+  TRANSBNK_BASE_URL: z
+    .string()
+    .url()
+    .default(process.env.TRANSBNK_BASE_URL || "https://sandbox-api.trusthub.in"),
+  TRANSBNK_API_KEY: z
+    .string()
+    .min(1)
+    .default(process.env.TRANSBNK_API_KEY || "sandbox_api_key"),
+  TRANSBNK_CLIENT_ID: z
+    .string()
+    .min(1)
+    .default(process.env.TRANSBNK_CLIENT_ID || "sandbox_client_id"),
+  TRANSBNK_USERNAME: z
+    .string()
+    .min(1)
+    .default(process.env.TRANSBNK_USERNAME || "sandbox_username"),
+  TRANSBNK_CLIENT_PASSWORD: z
+    .string()
+    .min(1)
+    .default(process.env.TRANSBNK_CLIENT_PASSWORD || "sandbox_password"),
+  TRANSBNK_PROVIDER: z
+    .enum(["mock", "http"])
+    .default((process.env.TRANSBNK_PROVIDER as "mock" | "http") || "mock"),
+}).superRefine((data, ctx) => {
+  if (data.NODE_ENV === "production" && data.TRANSBNK_PROVIDER === "http") {
+    if (data.TRANSBNK_API_KEY === "sandbox_api_key") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TRANSBNK_API_KEY"],
+        message: "A real production TRANSBNK_API_KEY is required in production mode.",
+      });
+    }
+    if (data.TRANSBNK_CLIENT_ID === "sandbox_client_id") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TRANSBNK_CLIENT_ID"],
+        message: "A real production TRANSBNK_CLIENT_ID is required in production mode.",
+      });
+    }
+    if (data.TRANSBNK_USERNAME === "sandbox_username") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TRANSBNK_USERNAME"],
+        message: "A real production TRANSBNK_USERNAME is required in production mode.",
+      });
+    }
+    if (data.TRANSBNK_CLIENT_PASSWORD === "sandbox_password") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TRANSBNK_CLIENT_PASSWORD"],
+        message: "A real production TRANSBNK_CLIENT_PASSWORD is required in production mode.",
+      });
+    }
+  }
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

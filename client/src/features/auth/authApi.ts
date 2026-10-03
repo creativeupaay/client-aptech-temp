@@ -5,6 +5,7 @@ export interface SignupRequest {
   email: string;
   mobile: string;
   highestEducation: string;
+  city?: string;
   password: string;
   confirmPassword: string;
 }

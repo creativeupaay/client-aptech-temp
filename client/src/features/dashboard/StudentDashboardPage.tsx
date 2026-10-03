@@ -1,8 +1,15 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLogoutMutation, useGetMeQuery } from "../auth/authApi";
 import { useGetHubbleLaunchUrlMutation, useGetHubbleHistoryQuery } from "./hubbleApi";
+import {
+  useGetCardQuery,
+  useGetCardTransactionsQuery,
+  usePollCardStatusQuery,
+  useCheckKycStatusQuery,
+} from "../card/cardApi";
 import { Button } from "../../components/ui";
+import { Loader2 } from "lucide-react";
 import {
   DashboardHeader,
   CardSection,
@@ -16,17 +23,43 @@ import {
   HelpSupport,
 } from "./components";
 import { MOCK_DASHBOARD_DATA } from "./mockData";
+import { KycUpgradedSuccessModal } from "../card/components/KycUpgradedSuccessModal";
 
 export const StudentDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [logoutMutation] = useLogoutMutation();
   const { data: meData } = useGetMeQuery();
   const { data: hubbleHistoryData } = useGetHubbleHistoryQuery(undefined, {
     pollingInterval: 15000,
   });
   const [getHubbleLaunchUrl] = useGetHubbleLaunchUrlMutation();
-  const [launchError, setLaunchError] = React.useState<string | null>(null);
-  const [isLaunching, setIsLaunching] = React.useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [showKycSuccessModal, setShowKycSuccessModal] = useState(false);
+
+  const { data: cardRes } = useGetCardQuery();
+  const { data: transactionsRes } = useGetCardTransactionsQuery();
+  const liveCard = cardRes?.data?.card;
+
+  // Poll card creation status if status is APPLICATION_PENDING (API 5)
+  usePollCardStatusQuery(undefined, {
+    skip: liveCard?.status !== "APPLICATION_PENDING",
+    pollingInterval: 2000,
+  });
+
+  // Query KYC status if user returned from external portal
+  const { data: kycStatusRes } = useCheckKycStatusQuery(undefined, {
+    skip: liveCard?.kycStatus === "FULL_KYC",
+  });
+
+  useEffect(() => {
+    if (searchParams.get("kyc_callback") === "true" || searchParams.get("status") === "success") {
+      if (kycStatusRes?.data?.isCompleted) {
+        setShowKycSuccessModal(true);
+      }
+    }
+  }, [searchParams, kycStatusRes]);
 
   const handleRedeemVouchers = async () => {
     if (isLaunching) return;
@@ -86,6 +119,60 @@ export const StudentDashboardPage: React.FC = () => {
     initials,
   };
 
+  const transactionsList = React.useMemo(() => {
+    const liveCardList = (transactionsRes?.data?.transactions || []).map((t) => ({
+      id: t.txnId,
+      title: t.title,
+      date: new Date(t.createdAt).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      rawDate: new Date(t.createdAt).getTime(),
+      points: Math.floor(t.amount / 100),
+      amount: t.amount,
+      type: t.type,
+    }));
+
+    interface VoucherItem {
+      _id?: string;
+      orderId?: string;
+      brandName?: string;
+      denomination?: number;
+      pointsDebited?: number;
+      status?: string;
+      createdAt?: string;
+    }
+
+    const liveVoucherList = ((hubbleHistoryData?.data?.vouchers || []) as VoucherItem[]).map((v) => ({
+      id: v._id || v.orderId || `VOUCH-${Date.now()}`,
+      title: `Voucher: ${v.brandName || "Brand Gift Card"}`,
+      date: v.createdAt
+        ? new Date(v.createdAt).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Recent",
+      rawDate: v.createdAt ? new Date(v.createdAt).getTime() : 0,
+      points: -(v.pointsDebited || 0),
+      amount: v.denomination || 0,
+      type: "DR" as const,
+    }));
+
+    const combined = [...liveCardList, ...liveVoucherList];
+    if (combined.length > 0) {
+      combined.sort((a, b) => b.rawDate - a.rawDate);
+      return combined;
+    }
+
+    return MOCK_DASHBOARD_DATA.transactions;
+  }, [transactionsRes, hubbleHistoryData]);
+
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-gray-800 flex flex-col font-sans">
       {/* Top Header (Edge-to-Edge 72px Bar) */}
@@ -116,8 +203,18 @@ export const StudentDashboardPage: React.FC = () => {
 
         {/* Top Action Pill: Card Management Button (Height: 40px) */}
         <div className="mb-6 flex items-center">
-          <Button className="h-[40px] px-5 text-sm font-semibold rounded-lg shadow-2xs">
-            Card management
+          <Button
+            onClick={() => {
+              if (liveCard?.status === "NOT_APPLIED") {
+                navigate("/card/issuance");
+              } else {
+                const el = document.getElementById("card-controls-section");
+                el?.scrollIntoView({ behavior: "smooth" });
+              }
+            }}
+            className="h-[40px] px-5 text-sm font-semibold rounded-lg shadow-2xs cursor-pointer"
+          >
+            {liveCard?.status === "NOT_APPLIED" ? "Apply for Card" : "Card management"}
           </Button>
         </div>
 
@@ -125,24 +222,40 @@ export const StudentDashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-[560px_1fr] min-[1344px]:grid-cols-[560px_760px] gap-6 items-start w-full">
           {/* Left Column: Card & Wallet Controls (Max 560px) */}
           <div className="w-full max-w-[560px] flex flex-col gap-4">
+            {/* If Card Provisioning in Progress (API 5 Asynchronous polling) */}
+            {liveCard?.status === "APPLICATION_PENDING" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-xs animate-pulse">
+                <Loader2 className="w-5 h-5 text-amber-600 animate-spin shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-900 space-y-1">
+                  <p className="font-bold text-amber-950">Card Provisioning in Progress</p>
+                  <p className="text-amber-800 leading-relaxed">
+                    Your virtual RuPay prepaid card is currently being created on the TransBnk banking gateway. We are checking status automatically...
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Prepaid Card Display & Management */}
             <CardSection
               holderName={user.name}
-              cardNumber={MOCK_DASHBOARD_DATA.card.cardNumber}
-              maskedPan={MOCK_DASHBOARD_DATA.card.maskedPan}
-              expiry={MOCK_DASHBOARD_DATA.card.expiry}
-              cvv={MOCK_DASHBOARD_DATA.card.cvv}
+              maskedPan={liveCard?.maskedPan || MOCK_DASHBOARD_DATA.card.maskedPan}
+              expiry="••/••"
+              cvv="•••"
+              onViewDetails={liveCard?.status === "NOT_APPLIED" ? () => navigate("/card/issuance") : undefined}
             />
 
             {/* Balances, Limits & Load Money */}
             <CardBalanceBar
-              usedAmount={MOCK_DASHBOARD_DATA.card.usedAmount}
-              totalLimit={MOCK_DASHBOARD_DATA.card.totalLimit}
-              availableBalance={MOCK_DASHBOARD_DATA.card.availableBalance}
+              usedAmount={liveCard?.usedAmount ?? MOCK_DASHBOARD_DATA.card.usedAmount}
+              totalLimit={liveCard?.totalLimit ?? MOCK_DASHBOARD_DATA.card.totalLimit}
+              availableBalance={liveCard?.availableBalance ?? MOCK_DASHBOARD_DATA.card.availableBalance}
+              onLoadMoney={() => navigate("/load-money")}
             />
 
-            {/* KYC Upgrade Banner */}
-            <KycBanner />
+            {/* KYC Upgrade Banner (Shown if not already Full KYC) */}
+            {liveCard?.kycStatus !== "FULL_KYC" && (
+              <KycBanner onCompleteKyc={() => navigate("/kyc")} />
+            )}
 
             {/* Rewards: Cashback, Loyalty Points, Redeem Vouchers */}
             {launchError && (
@@ -165,10 +278,12 @@ export const StudentDashboardPage: React.FC = () => {
             />
 
             {/* Card Controls: PIN & Toggles */}
-            <CardControls
-              initialEnabled={MOCK_DASHBOARD_DATA.card.isCardEnabled}
-              initialLocked={MOCK_DASHBOARD_DATA.card.isCardLocked}
-            />
+            <div id="card-controls-section">
+              <CardControls
+                initialEnabled={liveCard?.isCardEnabled ?? MOCK_DASHBOARD_DATA.card.isCardEnabled}
+                initialLocked={liveCard?.isLocked ?? MOCK_DASHBOARD_DATA.card.isCardLocked}
+              />
+            </div>
           </div>
 
           {/* Right Column: Courses, Transactions, Financial & Support (Max 760px) */}
@@ -178,7 +293,7 @@ export const StudentDashboardPage: React.FC = () => {
 
             {/* Recent Transactions List */}
             <RecentTransactions
-              transactions={MOCK_DASHBOARD_DATA.transactions}
+              transactions={transactionsList}
             />
 
             {/* Explore Financial Solutions */}
@@ -189,6 +304,16 @@ export const StudentDashboardPage: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Full KYC Upgraded Celebration Modal */}
+      <KycUpgradedSuccessModal
+        isOpen={showKycSuccessModal}
+        newLimit={200000}
+        onBackToDashboard={() => {
+          setShowKycSuccessModal(false);
+          navigate("/dashboard", { replace: true });
+        }}
+      />
     </div>
   );
 };

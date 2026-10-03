@@ -20,6 +20,7 @@ export interface IUser {
   email: string;
   mobile: string;
   highestEducation: HighestEducation;
+  city?: string;
   passwordHash: string;
   role: UserRole;
   userType: UserType;
@@ -65,6 +66,12 @@ const userSchema = new Schema<IUserDocument>(
         values: HIGHEST_EDUCATION_OPTIONS,
         message: "{VALUE} is not a supported education qualification",
       },
+    },
+    city: {
+      type: String,
+      trim: true,
+      maxlength: [100, "City cannot exceed 100 characters"],
+      default: null,
     },
     passwordHash: {
       type: String,

@@ -91,3 +91,34 @@ export const ssoSimulateLimiter = createInMemoryLimiter({
   limit: 15,
   message: "Too many SSO simulation requests. Please slow down.",
 });
+
+/**
+ * 5. Card OTP Limiters:
+ * Protects POST /api/v1/card/send-otp
+ * cardOtpMobileLimiter: Max 5 requests per 10 minutes per mobile number.
+ * cardOtpIpLimiter: Max 20 requests per 10 minutes per IP address to prevent SMS toll fraud.
+ */
+export const cardOtpMobileLimiter = createInMemoryLimiter({
+  windowMs: 10 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req) => {
+    const mobile = req.body?.mobile;
+    if (mobile && typeof mobile === "string") {
+      return `card_otp_mob_${mobile.replace(/\D/g, "")}`;
+    }
+    return `card_otp_ip_${req.ip || req.socket.remoteAddress || "anonymous"}`;
+  },
+  message: "Too many card verification OTP requests. Please wait 10 minutes before retrying.",
+});
+
+export const cardOtpIpLimiter = createInMemoryLimiter({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  keyGenerator: (req) => {
+    return `card_otp_global_ip_${req.ip || req.socket.remoteAddress || "anonymous"}`;
+  },
+  message: "Too many card verification requests from this IP address. Please wait 10 minutes before retrying.",
+});
+
+// Backward-compatible alias for existing callers
+export const cardOtpLimiter = cardOtpMobileLimiter;

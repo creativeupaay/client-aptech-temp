@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import app from "../src/app.js";
 import { User, type IUserDocument } from "../src/modules/user/user.model.js";
 import { VoucherRedemption } from "../src/modules/hubble/voucherRedemption.model.js";
+import { DebitTransaction } from "../src/modules/hubble/debitTransaction.model.js";
 import { MockAptechCoinProvider } from "../src/services/aptech-coins/index.js";
 import { decryptSensitive } from "../src/utils/crypto.js";
 import { env } from "../src/env.config.js";
@@ -419,6 +420,44 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       const savedVoucher = await VoucherRedemption.findOne({ orderId: "HBL_ORD_GATEWAY_SUCCESS_01" });
       expect(savedVoucher).not.toBeNull();
       expect(savedVoucher?.status).toBe("ACTIVE");
+    });
+
+    it("should automatically refund student coins via reverseDebit when webhook reports FAILED status", async () => {
+      // 1. First record an active debit transaction for an order
+      await DebitTransaction.create({
+        userId: testUser._id,
+        studentId: testUser.studentId,
+        amount: 250,
+        transactionId: "TXN_HUBBLE_FAILED_ORDER_1",
+        orderId: "HBL_ORD_FAILED_999",
+        status: "DEBITED",
+      });
+
+      // 2. Simulate webhook reporting that order failed on merchant side
+      const webhookPayload = {
+        orderId: "HBL_ORD_FAILED_999",
+        userId: testUser._id.toString(),
+        studentId: testUser.studentId,
+        brandName: "Amazon",
+        status: "FAILED",
+        pointsDebited: 250,
+      };
+
+      const res = await request(app)
+        .post("/api/v1/hubble/webhook/transaction-status")
+        .send(webhookPayload);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      // 3. Verify voucher is marked REFUNDED
+      const savedVoucher = await VoucherRedemption.findOne({ orderId: "HBL_ORD_FAILED_999" });
+      expect(savedVoucher).not.toBeNull();
+      expect(savedVoucher?.status).toBe("REFUNDED");
+
+      // 4. Verify debit transaction is marked REVERSED
+      const updatedDebit = await DebitTransaction.findOne({ orderId: "HBL_ORD_FAILED_999" });
+      expect(updatedDebit?.status).toBe("REVERSED");
     });
   });
 

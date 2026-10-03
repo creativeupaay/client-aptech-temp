@@ -454,6 +454,39 @@ export class HubbleService {
       normalizedStatus = "ACTIVE";
     }
 
+    // Auto-reversal handling: if voucher redemption failed/cancelled on Hubble, restore student's coins
+    if (
+      normalizedStatus === "FAILED" ||
+      normalizedStatus === "CANCELLED"
+    ) {
+      const debitTx = await DebitTransaction.findOne({
+        $or: [
+          { orderId: data.orderId },
+          { referenceId: data.orderId },
+          ...(data.transactionId ? [{ transactionId: data.transactionId }] : []),
+        ],
+        status: "DEBITED",
+      });
+
+      if (debitTx) {
+        try {
+          await this.reverseDebit({
+            studentId: user.studentId,
+            userId: user._id.toString(),
+            transactionId: debitTx.transactionId,
+            referenceId: data.orderId,
+            reason: `Voucher order ${data.orderId} failed/cancelled on Hubble (Auto-Reversal)`,
+          });
+          normalizedStatus = "REFUNDED";
+        } catch (revErr) {
+          console.error(
+            `[HUBBLE WEBHOOK] Auto-reversal failed for order ${data.orderId}:`,
+            revErr
+          );
+        }
+      }
+    }
+
     const encryptedVoucherCode = data.voucherCode ? encryptSensitive(data.voucherCode) : undefined;
     const encryptedPin = data.pin ? encryptSensitive(data.pin) : undefined;
 

@@ -248,6 +248,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4b. POST /api/v1/cards/sync (Card Issuance Sync from TBX)
+  if ((urlPath === "/api/v1/cards/sync" || urlPath === "/cards/sync") && req.method === "POST") {
+    const body = await parseJsonBody(req);
+    console.log(`[PROCONNECT] Received card sync: Student=${body.studentId}, Mobile=${body.mobileNumber}, Status=${body.cardStatus}, Last4=${body.last4Digits}`);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        statusCode: 200,
+        message: "Student card details synchronized with ProConnect & ApTrack",
+        data: body,
+      })
+    );
+    return;
+  }
+
   // 5. POST /api/v1/coins/set (Set exact points balance)
   if (urlPath === "/api/v1/coins/set" && req.method === "POST") {
     const body = await parseJsonBody(req);

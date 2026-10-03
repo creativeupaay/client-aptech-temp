@@ -85,6 +85,24 @@ describe("Non-Aptech Student Signup & OTP Verification Flow", () => {
     expect(otpRecord?.purpose).toBe("SIGNUP_VERIFICATION");
   });
 
+  it("should capture and persist city during non-Aptech prospect registration", async () => {
+    const res = await request(app).post("/api/v1/auth/signup").send({
+      name: "Rohit Verma",
+      email: "rohit.verma@example.com",
+      mobile: "+91 9811122233",
+      highestEducation: "Undergraduate / Bachelor's",
+      city: "Bengaluru",
+      password: "Password@123",
+      confirmPassword: "Password@123",
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+
+    const user = await User.findOne({ mobile: "9811122233" });
+    expect(user?.city).toBe("Bengaluru");
+  });
+
   it("should allow incomplete signup retry with fresh OTP without throwing conflict", async () => {
     // 1st attempt
     await request(app).post("/api/v1/auth/signup").send(validSignupData);

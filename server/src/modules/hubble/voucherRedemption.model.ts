@@ -9,6 +9,7 @@ export const VOUCHER_STATUSES = [
   "USED",
   "EXPIRED",
   "CANCELLED",
+  "REFUNDED",
 ] as const;
 export type VoucherStatus = (typeof VOUCHER_STATUSES)[number];
 

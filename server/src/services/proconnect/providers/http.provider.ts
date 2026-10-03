@@ -59,4 +59,21 @@ export class HttpProconnectProvider implements IProconnectService {
       throw new ApiError(502, `ProConnect SSO connection error: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
+
+  public async syncCardIssuance(input: import("../proconnect.interface.js").ProconnectCardSyncInput): Promise<void> {
+    const endpoint = `${env.PROCONNECT_API_URL.replace(/\/+$/, "")}/cards/sync`;
+    try {
+      await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-TBX-Client-Id": env.PROCONNECT_CLIENT_ID,
+          "X-TBX-Client-Secret": env.PROCONNECT_CLIENT_SECRET,
+        },
+        body: JSON.stringify(input),
+      });
+    } catch (err) {
+      console.warn("[PROCONNECT] Card sync call failed, continuing gracefully:", err);
+    }
+  }
 }

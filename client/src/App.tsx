@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthPage, SSOCallbackPage } from "./features/auth";
 import { StudentDashboardPage } from "./features/dashboard";
+import {
+  CardIssuancePage,
+  LoadMoneyPage,
+  KycVerificationPage,
+} from "./features/card";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { PublicRoute } from "./routes/PublicRoute";
 
@@ -39,13 +44,42 @@ function App() {
         {/* ProConnect SSO Callback Route (Zero-PII Authorization Code Exchange) */}
         <Route path="/sso/callback" element={<SSOCallbackPage />} />
 
-
         {/* Protected student routes */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
               <StudentDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Card Issuance Flow */}
+        <Route
+          path="/card/issuance"
+          element={
+            <ProtectedRoute>
+              <CardIssuancePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Load Money Flow */}
+        <Route
+          path="/load-money"
+          element={
+            <ProtectedRoute>
+              <LoadMoneyPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Full KYC Flow */}
+        <Route
+          path="/kyc"
+          element={
+            <ProtectedRoute>
+              <KycVerificationPage />
             </ProtectedRoute>
           }
         />

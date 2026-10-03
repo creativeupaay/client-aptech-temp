@@ -22,7 +22,8 @@ export const signupSchema = z
       .trim()
       .min(1, "Full name is required")
       .min(2, "Name must be at least 2 characters")
-      .max(100, "Name must not exceed 100 characters"),
+      .max(100, "Name must not exceed 100 characters")
+      .regex(/^[a-zA-Z\s.'-]+$/, "Name should only contain letters, spaces, and hyphens/dots"),
     email: z
       .string()
       .trim()
@@ -40,6 +41,12 @@ export const signupSchema = z
       HIGHEST_EDUCATION_OPTIONS,
       "Please select a valid highest education qualification"
     ),
+    city: z
+      .string()
+      .trim()
+      .min(2, "City must be at least 2 characters long")
+      .max(100, "City cannot exceed 100 characters")
+      .optional(),
     password: z
       .string()
       .min(1, "Password is required")

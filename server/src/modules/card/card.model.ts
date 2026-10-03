@@ -18,10 +18,17 @@ export interface ICard {
   status: CardStatus;
   cardType: CardType;
   kycStatus: KycStatus;
+  senderTag?: string | null;
+  cardId?: string | null;
+  referenceId?: string | null;
   maskedPan?: string | null;
   issuerKitNo?: string | null;
   issuedAt?: Date | null;
+  availableBalance: number;
+  usedAmount: number;
+  totalLimit: number;
   isLocked: boolean;
+  isCardEnabled: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -55,6 +62,25 @@ const cardSchema = new Schema<ICardDocument>(
       type: String,
       enum: ["MIN_KYC", "FULL_KYC"],
       default: "MIN_KYC",
+      index: true,
+    },
+    senderTag: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    cardId: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    referenceId: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
     },
     maskedPan: {
       type: String,
@@ -70,9 +96,28 @@ const cardSchema = new Schema<ICardDocument>(
       type: Date,
       default: null,
     },
+    availableBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    usedAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalLimit: {
+      type: Number,
+      default: 10000,
+      min: 0,
+    },
     isLocked: {
       type: Boolean,
       default: false,
+    },
+    isCardEnabled: {
+      type: Boolean,
+      default: true,
     },
   },
   {
@@ -80,6 +125,9 @@ const cardSchema = new Schema<ICardDocument>(
     toJSON: {
       transform(_doc, ret: Record<string, unknown>) {
         delete ret.__v;
+        delete ret.cvv;
+        delete ret.cardNumber;
+        delete ret.expiry;
         return ret;
       },
     },

@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { ApiError } from "../../../utils/ApiError.js";
-import type { IProconnectService, ProconnectStudentProfile } from "../proconnect.interface.js";
+import type {
+  IProconnectService,
+  ProconnectCardSyncInput,
+  ProconnectStudentProfile,
+} from "../proconnect.interface.js";
 
 interface StoredCodeEntry {
   profile: ProconnectStudentProfile;
@@ -79,6 +83,22 @@ export class MockProconnectProvider implements IProconnectService {
     }
 
     return entry.profile;
+  }
+
+  /**
+   * Records student card issuance and synchronizes back to ProConnect ecosystem.
+   */
+  public async syncCardIssuance(input: ProconnectCardSyncInput): Promise<void> {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`\n=================================================`);
+      console.log(`[PROCONNECT CARD SYNC] Card issuance synced back to ProConnect:`);
+      console.log(`  Student ID:     ${input.studentId}`);
+      console.log(`  Mobile:         ${input.mobileNumber}`);
+      console.log(`  Card Status:    ${input.cardStatus}`);
+      console.log(`  Last 4 Digits:  ${input.last4Digits || "N/A"}`);
+      console.log(`  Timestamp:      ${input.timestamp || new Date().toISOString()}`);
+      console.log(`=================================================\n`);
+    }
   }
 
   /**
