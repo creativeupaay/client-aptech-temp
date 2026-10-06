@@ -5,6 +5,10 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
+    env: {
+      NODE_ENV: "test",
+      TRANSBNK_PROVIDER: "mock",
+    },
     testTimeout: 30000,
     hookTimeout: 30000,
   },

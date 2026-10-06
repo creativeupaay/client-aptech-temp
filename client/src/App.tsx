@@ -3,6 +3,7 @@ import { AuthPage, SSOCallbackPage } from "./features/auth";
 import { StudentDashboardPage } from "./features/dashboard";
 import {
   CardIssuancePage,
+  CardStatusPage,
   LoadMoneyPage,
   KycVerificationPage,
 } from "./features/card";
@@ -60,6 +61,16 @@ function App() {
           element={
             <ProtectedRoute>
               <CardIssuancePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Card Issuance Status & Celebration Flow */}
+        <Route
+          path="/card/status"
+          element={
+            <ProtectedRoute>
+              <CardStatusPage />
             </ProtectedRoute>
           }
         />

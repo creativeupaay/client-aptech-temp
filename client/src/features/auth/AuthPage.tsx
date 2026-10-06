@@ -22,12 +22,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = "signup" }) =>
     setIsOtpMode(true);
   };
 
-  const handleVerificationSuccess = (_data: AuthSuccessResponse["data"]) => {
-    navigate("/dashboard", { replace: true });
+  const handleVerificationSuccess = (data: AuthSuccessResponse["data"]) => {
+    const cardStatus = data?.card?.status;
+    const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
+    navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
   };
 
-  const handleLoginSuccess = (_data: AuthSuccessResponse["data"]) => {
-    navigate("/dashboard", { replace: true });
+  const handleLoginSuccess = (data: AuthSuccessResponse["data"]) => {
+    const cardStatus = data?.card?.status;
+    const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
+    navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
   };
 
   const handleUnverifiedMobile = (mobile: string) => {

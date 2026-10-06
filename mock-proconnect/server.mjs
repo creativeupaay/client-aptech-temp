@@ -25,6 +25,7 @@ const MIME_TYPES = {
 // Mock Aptech Coin Ledger & API Storage (Single Source of Truth at Aptech)
 // ============================================================================
 const studentCoins = new Map([
+  ["APT-2026-89490", 500],
   ["APT-2026-00417", 500],
   ["APT-2026-01554", 500],
   ["APT-2026-00892", 500],

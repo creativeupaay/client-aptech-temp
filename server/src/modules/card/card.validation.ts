@@ -194,23 +194,49 @@ export const registerAndIssueCardSchema = z
     }
   });
 
-export const completeFullKycSchema = z.object({
-  aadhaarNumber: z
-    .string()
-    .trim()
-    .transform((val) => val.replace(/\s+/g, ""))
-    .refine((val) => /^[0-9]{12}$/.test(val), "Aadhaar number must be exactly 12 digits"),
-  aadhaarOtp: z
-    .string()
-    .trim()
-    .min(4, "Aadhaar OTP must be between 4 and 6 digits")
-    .max(6, "Aadhaar OTP cannot exceed 6 digits"),
-  panNumber: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN card format (e.g. ABCDE1234F)"),
-});
+export const completeFullKycSchema = z
+  .object({
+    aadhaarNumber: z
+      .string()
+      .trim()
+      .transform((val) => val.replace(/\s+/g, ""))
+      .optional(),
+    aadhaarOtp: z
+      .string()
+      .trim()
+      .optional(),
+    panNumber: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .optional(),
+    isMock: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.isMock) {
+      if (!data.aadhaarNumber || !/^[0-9]{12}$/.test(data.aadhaarNumber)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Aadhaar number must be exactly 12 digits",
+          path: ["aadhaarNumber"],
+        });
+      }
+      if (!data.aadhaarOtp || data.aadhaarOtp.length < 4 || data.aadhaarOtp.length > 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Aadhaar OTP must be between 4 and 6 digits",
+          path: ["aadhaarOtp"],
+        });
+      }
+      if (!data.panNumber || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(data.panNumber)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid PAN card format (e.g. ABCDE1234F)",
+          path: ["panNumber"],
+        });
+      }
+    }
+  });
 
 export const loadMoneySchema = z.object({
   amount: z

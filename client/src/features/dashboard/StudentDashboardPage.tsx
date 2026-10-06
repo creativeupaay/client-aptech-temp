@@ -7,7 +7,9 @@ import {
   useGetCardTransactionsQuery,
   usePollCardStatusQuery,
   useCheckKycStatusQuery,
+  useUpdateCardControlsMutation,
 } from "../card/cardApi";
+import { clearCardSdkSession } from "../card/hooks/useCardSdk";
 import { Button } from "../../components/ui";
 import { Loader2 } from "lucide-react";
 import {
@@ -22,7 +24,6 @@ import {
   FinancialSolutions,
   HelpSupport,
 } from "./components";
-import { MOCK_DASHBOARD_DATA } from "./mockData";
 import { KycUpgradedSuccessModal } from "../card/components/KycUpgradedSuccessModal";
 
 export const StudentDashboardPage: React.FC = () => {
@@ -37,10 +38,27 @@ export const StudentDashboardPage: React.FC = () => {
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
   const [showKycSuccessModal, setShowKycSuccessModal] = useState(false);
+  const [updateCardControls] = useUpdateCardControlsMutation();
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-  const { data: cardRes } = useGetCardQuery();
+  const { data: cardRes, isLoading: isCardLoading } = useGetCardQuery();
   const { data: transactionsRes } = useGetCardTransactionsQuery();
   const liveCard = cardRes?.data?.card;
+
+  const isCardIssued =
+    liveCard?.status === "ISSUED" ||
+    liveCard?.status === "ACTIVE" ||
+    liveCard?.status === "FROZEN" ||
+    liveCard?.status === "BLOCKED";
+
+  // Requirement #2: If user does not have any card issued, redirect directly to card issuance
+  useEffect(() => {
+    if (!isCardLoading && cardRes) {
+      if (!isCardIssued && liveCard?.status !== "APPLICATION_PENDING") {
+        navigate("/card/issuance", { replace: true });
+      }
+    }
+  }, [isCardLoading, cardRes, isCardIssued, liveCard?.status, navigate]);
 
   // Poll card creation status if status is APPLICATION_PENDING (API 5)
   usePollCardStatusQuery(undefined, {
@@ -60,6 +78,30 @@ export const StudentDashboardPage: React.FC = () => {
       }
     }
   }, [searchParams, kycStatusRes]);
+
+  const handleToggleEnabled = async (enabled: boolean) => {
+    try {
+      await updateCardControls({ isCardEnabled: enabled }).unwrap();
+      setFeedbackMessage(enabled ? "Card enabled successfully" : "Card paused/disabled successfully");
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err) {
+      console.error("Failed to update card status:", err);
+      setFeedbackMessage("Failed to update card status. Please try again.");
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    }
+  };
+
+  const handleToggleLock = async (locked: boolean) => {
+    try {
+      await updateCardControls({ isLocked: locked }).unwrap();
+      setFeedbackMessage(locked ? "Card locked successfully" : "Card unlocked successfully");
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    } catch (err) {
+      console.error("Failed to update card lock:", err);
+      setFeedbackMessage("Failed to update card lock. Please try again.");
+      setTimeout(() => setFeedbackMessage(null), 3500);
+    }
+  };
 
   const handleRedeemVouchers = async () => {
     if (isLaunching) return;
@@ -86,6 +128,7 @@ export const StudentDashboardPage: React.FC = () => {
     } catch {
       // Ignore network errors on logout
     } finally {
+      clearCardSdkSession();
       localStorage.removeItem("tbx_auth_token");
       localStorage.removeItem("tbx_student_user");
       navigate("/login", { replace: true });
@@ -102,8 +145,8 @@ export const StudentDashboardPage: React.FC = () => {
   }, []);
 
   const activeUser = meData?.data?.user || storedUser;
-  const userName = activeUser?.name || MOCK_DASHBOARD_DATA.user.name;
-  const studentId = activeUser?.studentId || MOCK_DASHBOARD_DATA.user.studentId;
+  const userName = activeUser?.name || "Student";
+  const studentId = activeUser?.studentId || "";
   const initials =
     userName
       .split(" ")
@@ -111,7 +154,7 @@ export const StudentDashboardPage: React.FC = () => {
       .filter(Boolean)
       .join("")
       .slice(0, 2)
-      .toUpperCase() || MOCK_DASHBOARD_DATA.user.initials;
+      .toUpperCase() || "ST";
 
   const user = {
     name: userName,
@@ -170,8 +213,21 @@ export const StudentDashboardPage: React.FC = () => {
       return combined;
     }
 
-    return MOCK_DASHBOARD_DATA.transactions;
+    return [];
   }, [transactionsRes, hubbleHistoryData]);
+
+  if (isCardLoading || (!isCardIssued && liveCard?.status !== "APPLICATION_PENDING")) {
+    return (
+      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-sm font-medium text-gray-500">
+            {isCardLoading ? "Loading dashboard..." : "Redirecting to card issuance..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-gray-800 flex flex-col font-sans">
@@ -224,12 +280,18 @@ export const StudentDashboardPage: React.FC = () => {
           <div className="w-full max-w-[560px] flex flex-col gap-4">
             {/* If Card Provisioning in Progress (API 5 Asynchronous polling) */}
             {liveCard?.status === "APPLICATION_PENDING" && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-xs animate-pulse">
+              <div
+                onClick={() => navigate("/card/status")}
+                className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-xs animate-pulse cursor-pointer hover:bg-amber-100/60 transition"
+              >
                 <Loader2 className="w-5 h-5 text-amber-600 animate-spin shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-900 space-y-1">
-                  <p className="font-bold text-amber-950">Card Provisioning in Progress</p>
+                  <p className="font-bold text-amber-950 flex items-center justify-between">
+                    <span>Card Provisioning in Progress</span>
+                    <span className="text-[11px] font-semibold text-amber-700 underline">View Status →</span>
+                  </p>
                   <p className="text-amber-800 leading-relaxed">
-                    Your virtual RuPay prepaid card is currently being created on the TransBnk banking gateway. We are checking status automatically...
+                    Your virtual RuPay prepaid card is currently being created on the TransBnk banking gateway. Click to view live progress.
                   </p>
                 </div>
               </div>
@@ -238,17 +300,19 @@ export const StudentDashboardPage: React.FC = () => {
             {/* Prepaid Card Display & Management */}
             <CardSection
               holderName={user.name}
-              maskedPan={liveCard?.maskedPan || MOCK_DASHBOARD_DATA.card.maskedPan}
+              maskedPan={liveCard?.maskedPan || (liveCard?.status === "NOT_APPLIED" ? "Card Not Applied" : "•••• •••• •••• ••••")}
               expiry="••/••"
               cvv="•••"
+              isLocked={liveCard?.isLocked ?? false}
+              isCardEnabled={liveCard?.isCardEnabled ?? true}
               onViewDetails={liveCard?.status === "NOT_APPLIED" ? () => navigate("/card/issuance") : undefined}
             />
 
             {/* Balances, Limits & Load Money */}
             <CardBalanceBar
-              usedAmount={liveCard?.usedAmount ?? MOCK_DASHBOARD_DATA.card.usedAmount}
-              totalLimit={liveCard?.totalLimit ?? MOCK_DASHBOARD_DATA.card.totalLimit}
-              availableBalance={liveCard?.availableBalance ?? MOCK_DASHBOARD_DATA.card.availableBalance}
+              usedAmount={liveCard?.usedAmount ?? 0}
+              totalLimit={liveCard?.totalLimit ?? 10000}
+              availableBalance={liveCard?.availableBalance ?? 0}
               onLoadMoney={() => navigate("/load-money")}
             />
 
@@ -272,16 +336,34 @@ export const StudentDashboardPage: React.FC = () => {
               </div>
             )}
             <RewardStats
-              cashback={MOCK_DASHBOARD_DATA.rewards.cashback}
-              loyaltyPoints={hubbleHistoryData?.data?.currentBalance ?? MOCK_DASHBOARD_DATA.rewards.loyaltyPoints}
+              cashback={0}
+              loyaltyPoints={hubbleHistoryData?.data?.currentBalance ?? 0}
               onRedeemVouchers={handleRedeemVouchers}
             />
+
+            {/* Feedback message banner for toggles */}
+            {feedbackMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between shadow-2xs">
+                <span>{feedbackMessage}</span>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackMessage(null)}
+                  className="text-emerald-500 hover:text-emerald-800 ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* Card Controls: PIN & Toggles */}
             <div id="card-controls-section">
               <CardControls
-                initialEnabled={liveCard?.isCardEnabled ?? MOCK_DASHBOARD_DATA.card.isCardEnabled}
-                initialLocked={liveCard?.isLocked ?? MOCK_DASHBOARD_DATA.card.isCardLocked}
+                initialEnabled={liveCard?.isCardEnabled ?? true}
+                initialLocked={liveCard?.isLocked ?? false}
+                maskedPan={liveCard?.maskedPan || undefined}
+                holderName={user.name}
+                onToggleEnabled={handleToggleEnabled}
+                onToggleLock={handleToggleLock}
               />
             </div>
           </div>

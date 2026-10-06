@@ -7,6 +7,7 @@ import { TransbankFactory } from "../../services/transbank/index.js";
 import { ProconnectFactory } from "../../services/proconnect/index.js";
 import { AptrackFactory } from "../../services/aptrack/index.js";
 import { User } from "../user/user.model.js";
+import { env } from "../../env.config.js";
 import type {
   CompleteFullKycInput,
   LoadMoneyInput,
@@ -78,20 +79,35 @@ export class CardService {
 
     // Step 1: Register customer (API 2) if senderTag not already acquired
     if (!senderTag) {
-      const regResult = await transbank.registerCustomer({
-        name: input.name,
-        mobile: input.mobile,
-        email: input.email,
-        documentType: input.documentType,
-        documentValue: input.documentValue,
-        dateOfBirth: input.dateOfBirth,
-        otp: input.otp,
-        context: {},
-      });
+      try {
+        const regResult = await transbank.registerCustomer({
+          name: input.name,
+          mobile: input.mobile,
+          email: input.email,
+          documentType: input.documentType,
+          documentValue: input.documentValue,
+          dateOfBirth: input.dateOfBirth,
+          otp: input.otp,
+          context: {},
+        });
 
-      senderTag = regResult.senderTag;
-      card.senderTag = senderTag;
-      await card.save();
+        senderTag = regResult.senderTag;
+        card.senderTag = senderTag;
+        await card.save();
+      } catch (err: unknown) {
+        if (
+          err instanceof ApiError &&
+          (err.statusCode === 409 || err.message?.includes("already registered"))
+        ) {
+          if (card.senderTag) {
+            senderTag = card.senderTag;
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
     }
 
     // Step 2: Trigger Card Create (API 4) if referenceId not yet assigned or status NOT_APPLIED
@@ -105,6 +121,15 @@ export class CardService {
         context: {},
       });
 
+      if (createResult.status === "FAILED" || !createResult.referenceId) {
+        card.status = "NOT_APPLIED";
+        card.referenceId = null;
+        await card.save();
+        throw ApiError.badRequest(
+          createResult.message || "Card creation request failed on TransBnk gateway."
+        );
+      }
+
       referenceId = createResult.referenceId;
       card.referenceId = referenceId;
       card.status = "APPLICATION_PENDING";
@@ -112,23 +137,41 @@ export class CardService {
     }
 
     // Step 3: Poll Card Creation Status (API 5)
-    // Dynamic polling based on provider mode
-    let cardStatusResult = await transbank.getCardCreationStatus({
-      referenceId,
-      senderTag,
-    });
+    // In live HTTP mode: return APPLICATION_PENDING immediately so user transitions to /card/status and sees live progress.
+    // In mock mode: synchronously poll to finalize for unit tests.
+    let cardStatusResult: {
+      status: "SUBMITTED" | "SUCCESS" | "FAILED";
+      cardId?: string;
+      message?: string;
+      maskedPan?: string;
+    } = {
+      status: "SUBMITTED",
+      message: "Card creation submitted to banking gateway.",
+    };
 
-    let attempts = 0;
-    const isHttp = process.env.TRANSBNK_PROVIDER === "http";
-    const maxAttempts = isHttp ? 10 : 5;
-    const pollInterval = isHttp ? 1500 : 300;
-    while (cardStatusResult.status === "SUBMITTED" && attempts < maxAttempts) {
-      attempts++;
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
-      cardStatusResult = await transbank.getCardCreationStatus({
-        referenceId,
-        senderTag,
-      });
+    const isHttp = env.TRANSBNK_PROVIDER === "http";
+
+    if (!isHttp) {
+      try {
+        cardStatusResult = await transbank.getCardCreationStatus({
+          referenceId,
+          senderTag,
+        });
+
+        let attempts = 0;
+        const maxAttempts = 5;
+        const pollInterval = 300;
+        while (cardStatusResult.status === "SUBMITTED" && attempts < maxAttempts) {
+          attempts++;
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+          cardStatusResult = await transbank.getCardCreationStatus({
+            referenceId,
+            senderTag,
+          });
+        }
+      } catch (pollErr) {
+        console.warn("[CARD_SERVICE] Synchronous status check error:", pollErr);
+      }
     }
 
     if (cardStatusResult.status === "FAILED") {
@@ -141,7 +184,7 @@ export class CardService {
       );
     }
 
-    if (cardStatusResult.status !== "SUCCESS") {
+    if (cardStatusResult.status !== "SUCCESS" || !cardStatusResult.cardId) {
       card.status = "APPLICATION_PENDING";
       await card.save();
       return card;
@@ -298,8 +341,13 @@ export class CardService {
 
     const transbank = TransbankFactory.getProvider();
 
-    // In live HTTP mode, verify with TransBnk / Oxymoney that KYC was actually completed
-    if (process.env.TRANSBNK_PROVIDER === "http") {
+    // In mock mode or when explicitly mocking verification
+    if (input.isMock) {
+      if (transbank.simulateKycCompletion) {
+        transbank.simulateKycCompletion(card.senderTag);
+      }
+    } else if (env.TRANSBNK_PROVIDER === "http") {
+      // In live HTTP mode, verify with TransBnk / Oxymoney that KYC was actually completed
       const kycStatusResult = await transbank.getFullKycUrl({ senderId: card.senderTag });
       if (kycStatusResult.kycRequired) {
         throw ApiError.badRequest(
@@ -308,6 +356,28 @@ export class CardService {
       }
     } else if (transbank.simulateKycCompletion) {
       // In mock/dev/test mode: simulate approved KYC
+      transbank.simulateKycCompletion(card.senderTag);
+    }
+
+    card.kycStatus = "FULL_KYC";
+    card.totalLimit = 200000;
+    await card.save();
+
+    return card;
+  }
+
+  /**
+   * Mocks Full KYC verification for development, testing, and sandbox demonstrations.
+   * Atomically upgrades card KYC status to FULL_KYC and increases limit to ₹2,00,000.
+   */
+  public static async mockCompleteFullKyc(
+    userId: Types.ObjectId | string
+  ): Promise<ICardDocument> {
+    const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
+    const card = await this.getCard(objectId);
+
+    const transbank = TransbankFactory.getProvider();
+    if (card.senderTag && transbank.simulateKycCompletion) {
       transbank.simulateKycCompletion(card.senderTag);
     }
 
@@ -330,53 +400,62 @@ export class CardService {
     }
 
     if (!card.referenceId || !card.senderTag) {
+      if (card.status === "APPLICATION_PENDING" && !card.referenceId) {
+        card.status = "NOT_APPLIED";
+        await card.save();
+      }
       return card;
     }
 
     const transbank = TransbankFactory.getProvider();
-    const statusResult = await transbank.getCardCreationStatus({
-      referenceId: card.referenceId,
-      senderTag: card.senderTag,
-    });
+    try {
+      const statusResult = await transbank.getCardCreationStatus({
+        referenceId: card.referenceId,
+        senderTag: card.senderTag,
+      });
 
-    if (statusResult.status === "SUCCESS") {
-      card.cardId = statusResult.cardId;
-      card.status = "ACTIVE";
-      card.issuedAt = new Date();
-      card.maskedPan = statusResult.maskedPan || "•••• •••• •••• 8942";
-      card.totalLimit = card.kycStatus === "FULL_KYC" ? 200000 : 10000;
-      await card.save();
+      if (statusResult.status === "SUCCESS") {
+        card.cardId = statusResult.cardId;
+        card.status = "ACTIVE";
+        card.issuedAt = new Date();
+        card.maskedPan = statusResult.maskedPan || "•••• •••• •••• 8942";
+        card.totalLimit = card.kycStatus === "FULL_KYC" ? 200000 : 10000;
+        await card.save();
 
-      const studentUser = await User.findById(objectId);
-      const last4 = (card.maskedPan || "8942").replace(/\D/g, "").slice(-4) || "8942";
+        const studentUser = await User.findById(objectId);
+        const last4 = (card.maskedPan || "8942").replace(/\D/g, "").slice(-4) || "8942";
 
-      if (studentUser?.studentId) {
-        ProconnectFactory.getProvider()
-          .syncCardIssuance({
-            studentId: studentUser.studentId,
-            mobileNumber: studentUser.mobile,
-            emailId: studentUser.email,
-            cardStatus: "ACTIVE",
-            last4Digits: last4,
-            merchantTransactionId: card.referenceId,
-            timestamp: new Date().toISOString(),
-          })
-          .catch((err) => console.warn("[PROCONNECT] Polled card sync error:", err));
-      } else if (studentUser) {
-        AptrackFactory.getProvider()
-          .syncLeadCardStatus({
-            mobile: studentUser.mobile,
-            cardStatus: "ACTIVE",
-            last4Digits: last4,
-            cardId: card.cardId,
-            timestamp: new Date().toISOString(),
-          })
-          .catch((err) => console.warn("[APTRACK] Polled card sync error:", err));
+        if (studentUser?.studentId) {
+          ProconnectFactory.getProvider()
+            .syncCardIssuance({
+              studentId: studentUser.studentId,
+              mobileNumber: studentUser.mobile,
+              emailId: studentUser.email,
+              cardStatus: "ACTIVE",
+              last4Digits: last4,
+              merchantTransactionId: card.referenceId,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) => console.warn("[PROCONNECT] Polled card sync error:", err));
+        } else if (studentUser) {
+          AptrackFactory.getProvider()
+            .syncLeadCardStatus({
+              mobile: studentUser.mobile,
+              cardStatus: "ACTIVE",
+              last4Digits: last4,
+              cardId: card.cardId,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) => console.warn("[APTRACK] Polled card sync error:", err));
+        }
+      } else if (statusResult.status === "FAILED") {
+        card.status = "NOT_APPLIED";
+        card.referenceId = null;
+        await card.save();
       }
-    } else if (statusResult.status === "FAILED") {
-      card.status = "NOT_APPLIED";
-      card.referenceId = null;
-      await card.save();
+    } catch (err) {
+      console.warn("[CARD_SERVICE] pollCardStatus transient error during polling cycle:", err);
+      // Return card gracefully in its current APPLICATION_PENDING state
     }
 
     return card;
@@ -389,12 +468,12 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (card.status !== "ACTIVE" && card.status !== "ISSUED") {
-      throw ApiError.badRequest("Card must be active to initiate a secure Card SDK session.");
+    if (card.status === "NOT_APPLIED") {
+      throw ApiError.badRequest("Card must be applied and issued before initiating a Card SDK session.");
     }
 
     if (!card.cardId) {
-      throw ApiError.badRequest("Active card ID is missing. Please poll card status or contact support.");
+      throw ApiError.badRequest("Active card ID is missing. Please complete card issuance or contact support.");
     }
 
     const studentUser = await User.findById(objectId);
@@ -404,9 +483,12 @@ export class CardService {
       senderTag: card.senderTag,
       maskedPan: card.maskedPan || "•••• •••• •••• 8942",
       holderName: studentUser?.name || "Cardholder",
+      clientId: env.TRANSBNK_CLIENT_ID || "EXTCLT000454",
+      clientToken: env.TRANSBNK_CLIENT_PASSWORD || "035950b0-dcaf-4f84-99be-1a23773f5e40",
+      mobileNumber: studentUser?.mobile || "",
       sdkUrl: "https://cardsdk.oxymoney.com/v3",
       sdkSessionToken: `sdk_sess_${randomUUID()}`,
-      environment: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+      environment: env.NODE_ENV === "production" ? "production" : "sandbox",
     };
   }
 
@@ -523,7 +605,7 @@ export class CardService {
     });
 
     let loadAttempts = 0;
-    const isHttp = process.env.TRANSBNK_PROVIDER === "http";
+    const isHttp = env.TRANSBNK_PROVIDER === "http";
     const maxStatusAttempts = isHttp ? 5 : 3;
     const statusPollInterval = isHttp ? 1000 : 300;
     while (statusResult.status === "SUBMITTED" && loadAttempts < maxStatusAttempts) {

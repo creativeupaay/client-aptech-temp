@@ -42,8 +42,8 @@
       <!-- Right Profile Pill -->
       <div class="flex items-center gap-3">
         <div class="text-right hidden sm:block">
-          <p id="topStudentName" class="text-xs font-bold text-gray-900">Aarav Sharma</p>
-          <p id="topStudentId" class="text-[11px] font-mono text-[#D85A14]">APT-2026-00417</p>
+          <p id="topStudentName" class="text-xs font-bold text-gray-900">Amit Sunda</p>
+          <p id="topStudentId" class="text-[11px] font-mono text-[#D85A14]">APT-2026-89490</p>
         </div>
         <div id="topAvatar" class="w-9 h-9 rounded-full bg-[#D85A14] text-white text-xs font-bold flex items-center justify-center shadow-xs">
           AS
@@ -65,8 +65,8 @@
             AS
           </div>
           <div>
-            <h2 id="cardStudentName" class="text-lg font-extrabold text-gray-900">Aarav Sharma</h2>
-            <p id="cardStudentId" class="text-xs font-mono font-bold text-[#D85A14]">APT-2026-00417</p>
+            <h2 id="cardStudentName" class="text-lg font-extrabold text-gray-900">Amit Sunda</h2>
+            <p id="cardStudentId" class="text-xs font-mono font-bold text-[#D85A14]">APT-2026-89490</p>
             <span class="inline-block mt-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
               ENROLLED STUDENT
             </span>
@@ -76,15 +76,15 @@
         <div class="space-y-3 pt-3 border-t border-gray-100 text-xs">
           <div class="flex justify-between">
             <span class="text-gray-500">Program:</span>
-            <span class="font-bold text-gray-900">MAAC 3D Animation & VFX</span>
+            <span id="cardStudentProgram" class="font-bold text-gray-900">Full Stack Software Engineering</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500">Center:</span>
-            <span class="font-bold text-gray-900">Mumbai Central (MH-01)</span>
+            <span id="cardStudentCenter" class="font-bold text-gray-900">Jaipur Center (RJ-01)</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500">Attendance:</span>
-            <span class="font-bold text-emerald-600">96.4%</span>
+            <span class="font-bold text-emerald-600">98.2%</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500">Fee Status:</span>
@@ -292,8 +292,8 @@
           <span class="text-[11px] font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 font-bold">Mock Config</span>
         </div>
 
-        <!-- 3 Persona Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+        <!-- 4 Persona Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           <button
             type="button"
             onclick="setPersona(0)"
@@ -301,11 +301,11 @@
             class="text-left p-3.5 rounded-2xl border-2 border-[#D85A14] bg-orange-50/50 transition cursor-pointer flex flex-col justify-between"
           >
             <div>
-              <span class="text-[10px] font-bold text-[#D85A14] uppercase tracking-wider block mb-1">Standard Enrolled</span>
-              <p class="font-bold text-xs text-gray-900">Aarav Sharma</p>
-              <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-00417</p>
+              <span class="text-[10px] font-bold text-[#D85A14] uppercase tracking-wider block mb-1">New User (No Card)</span>
+              <p class="font-bold text-xs text-gray-900">Amit Sunda</p>
+              <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-89490</p>
             </div>
-            <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 9876543210</span>
+            <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 8949006288</span>
           </button>
 
           <button
@@ -315,7 +315,21 @@
             class="text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between"
           >
             <div>
-              <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1">Auto-Link Prospect</span>
+              <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1">Standard Enrolled</span>
+              <p class="font-bold text-xs text-gray-900">Aarav Sharma</p>
+              <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-00417</p>
+            </div>
+            <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 9876543210</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="setPersona(2)"
+            id="pCard2"
+            class="text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <span class="text-[10px] font-bold text-purple-600 uppercase tracking-wider block mb-1">Auto-Link Prospect</span>
               <p class="font-bold text-xs text-gray-900">Pooja Hegde</p>
               <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-00892</p>
             </div>
@@ -324,8 +338,8 @@
 
           <button
             type="button"
-            onclick="setPersona(2)"
-            id="pCard2"
+            onclick="setPersona(3)"
+            id="pCard3"
             class="text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between"
           >
             <div>
@@ -381,25 +395,40 @@
   <script>
     const PERSONAS = [
       {
+        studentId: "APT-2026-89490",
+        name: "Amit Sunda",
+        mobile: "8949006288",
+        email: "amit.sunda@example.com",
+        initials: "AS",
+        program: "Full Stack Software Engineering",
+        center: "Jaipur Center (RJ-01)"
+      },
+      {
         studentId: "APT-2026-00417",
         name: "Aarav Sharma",
         mobile: "9876543210",
         email: "aarav.sharma@example.com",
-        initials: "AS"
+        initials: "AS",
+        program: "MAAC 3D Animation & VFX",
+        center: "Mumbai Central (MH-01)"
       },
       {
         studentId: "APT-2026-00892",
         name: "Pooja Hegde",
         mobile: "9888877777",
         email: "pooja.hegde@example.com",
-        initials: "PH"
+        initials: "PH",
+        program: "Arena Animation Prime",
+        center: "Bangalore Whitefield (KA-04)"
       },
       {
         studentId: "APT-2026-01554",
         name: "Sneha Patel",
         mobile: "9123456789",
         email: "sneha.patel@example.com",
-        initials: "SP"
+        initials: "SP",
+        program: "Hardware & Networking (Aptech N-Power)",
+        center: "Ahmedabad Navrangpura (GJ-02)"
       }
     ];
 
@@ -422,10 +451,17 @@
       document.getElementById("cardStudentName").innerText = p.name;
       document.getElementById("cardStudentId").innerText = p.studentId;
       document.getElementById("cardAvatar").innerText = p.initials;
+      if (document.getElementById("cardStudentProgram")) {
+        document.getElementById("cardStudentProgram").innerText = p.program || "Course Student";
+      }
+      if (document.getElementById("cardStudentCenter")) {
+        document.getElementById("cardStudentCenter").innerText = p.center || "Aptech Center";
+      }
 
       // Update Card highlights
-      [0, 1, 2].forEach(i => {
+      PERSONAS.forEach((_, i) => {
         const el = document.getElementById("pCard" + i);
+        if (!el) return;
         if (i === index) {
           el.className = "text-left p-3.5 rounded-2xl border-2 border-[#D85A14] bg-orange-50/50 transition cursor-pointer flex flex-col justify-between";
         } else {

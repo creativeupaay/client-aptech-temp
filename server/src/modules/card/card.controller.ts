@@ -137,6 +137,27 @@ export class CardController {
     }
   }
 
+  public static async mockCompleteFullKyc(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = CardController.getUserId(req);
+      const card = await CardService.mockCompleteFullKyc(userId);
+      sendResponse(res, {
+        statusCode: 200,
+        message: "Full KYC verified successfully (Mock). Card limit upgraded to ₹2,00,000.",
+        data: {
+          card,
+          newLimit: card.totalLimit,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async checkKycStatus(
     req: AuthenticatedRequest,
     res: Response,

@@ -81,6 +81,9 @@ export interface CardSdkSessionResponse {
   senderTag: string;
   maskedPan: string;
   holderName: string;
+  clientId: string;
+  clientToken: string;
+  mobileNumber: string;
   sdkUrl: string;
   sdkSessionToken: string;
   environment: string;
@@ -130,7 +133,28 @@ export const cardApi = baseApi.injectEndpoints({
 
     pollCardStatus: builder.query<{ success: boolean; data: { card: CardData }; message: string }, void>({
       query: () => "/card/poll-status",
-      providesTags: ["Card"],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data?.data?.card) {
+            dispatch(
+              cardApi.util.updateQueryData("getCard", undefined, (draft) => {
+                if (draft?.data) {
+                  draft.data.card = data.data.card;
+                }
+              })
+            );
+            if (
+              data.data.card.status === "ACTIVE" ||
+              data.data.card.status === "ISSUED"
+            ) {
+              dispatch(cardApi.util.invalidateTags(["Card"]));
+            }
+          }
+        } catch {
+          // ignore polling transient errors
+        }
+      },
     }),
 
     getCardSdkSession: builder.query<{ success: boolean; data: CardSdkSessionResponse }, void>({
@@ -145,6 +169,17 @@ export const cardApi = baseApi.injectEndpoints({
         url: "/card/complete-kyc",
         method: "POST",
         body,
+      }),
+      invalidatesTags: ["Card"],
+    }),
+
+    mockCompleteFullKyc: builder.mutation<
+      { success: boolean; data: { card: CardData; newLimit: number }; message: string },
+      void
+    >({
+      query: () => ({
+        url: "/card/mock-complete-kyc",
+        method: "POST",
       }),
       invalidatesTags: ["Card"],
     }),
@@ -195,6 +230,7 @@ export const {
   useLazyPollCardStatusQuery,
   useGetCardSdkSessionQuery,
   useCompleteFullKycMutation,
+  useMockCompleteFullKycMutation,
   useLoadMoneyMutation,
   useGetCardTransactionsQuery,
   useUpdateCardControlsMutation,

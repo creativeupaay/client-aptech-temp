@@ -72,3 +72,42 @@
   background: #94a3b8;
 }
 
+/* CardSDK Built-in UI Overrides — Aptech Brand Platform Color (#DB6516) */
+.csdk-otp__btn--primary,
+#csdk-btn-send {
+  background-color: #DB6516 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 3px rgba(219, 101, 22, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+.csdk-otp__btn--primary:hover:not(:disabled),
+#csdk-btn-send:hover:not(:disabled) {
+  background-color: #C05510 !important;
+}
+
+.csdk-otp__btn--success,
+#csdk-btn-verify {
+  background-color: #DB6516 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 1px 3px rgba(219, 101, 22, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+.csdk-otp__btn--success:hover:not(:disabled),
+#csdk-btn-verify:hover:not(:disabled) {
+  background-color: #C05510 !important;
+}
+
+.csdk-otp__btn--outline:hover,
+#csdk-btn-resend:hover {
+  border-color: #DB6516 !important;
+  color: #DB6516 !important;
+}
+
+.csdk-otp__input:focus {
+  border-color: #DB6516 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(219, 101, 22, 0.2) !important;
+}
+

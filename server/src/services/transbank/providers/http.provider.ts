@@ -87,7 +87,7 @@ export class HttpTransbankProvider implements ITransbankProvider {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify(sanitizedPayload),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(30000),
       });
 
       const responseText = await response.text();
@@ -144,7 +144,7 @@ export class HttpTransbankProvider implements ITransbankProvider {
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
       if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
-        throw ApiError.gatewayTimeout("TransBnk API request timed out after 10000ms.");
+        throw ApiError.gatewayTimeout("TransBnk API request timed out after 30000ms.");
       }
       throw ApiError.badGateway(
         `Failed to communicate with TransBnk Banking Gateway: ${

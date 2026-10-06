@@ -38,9 +38,11 @@ export const SSOCallbackPage: React.FC = () => {
           localStorage.setItem("tbx_student_user", JSON.stringify(response.data.user));
         }
 
-        // Brief delay for user feedback, then transition to dashboard
+        // Brief delay for user feedback, then transition to dashboard or issuance
         setTimeout(() => {
-          navigate("/dashboard", { replace: true });
+          const cardStatus = response.data?.card?.status;
+          const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
+          navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
         }, 1200);
       } catch (err: unknown) {
         interface ApiErrorResponse {

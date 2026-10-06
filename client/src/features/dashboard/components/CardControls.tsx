@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../../../components/ui";
-import { GeneratePinModal } from "./GeneratePinModal";
+import { useCardSdk } from "../../card";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface CardControlsProps {
   initialEnabled?: boolean;
   initialLocked?: boolean;
+  maskedPan?: string;
+  holderName?: string;
   onGeneratePin?: () => void;
-  onToggleEnabled?: (enabled: boolean) => void;
-  onToggleLock?: (locked: boolean) => void;
+  onToggleEnabled?: (enabled: boolean) => void | Promise<void>;
+  onToggleLock?: (locked: boolean) => void | Promise<void>;
 }
 
 export const CardControls: React.FC<CardControlsProps> = ({
@@ -19,23 +22,50 @@ export const CardControls: React.FC<CardControlsProps> = ({
 }) => {
   const [isEnabled, setIsEnabled] = useState(initialEnabled);
   const [isLocked, setIsLocked] = useState(initialLocked);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isLaunchingPin, setIsLaunchingPin] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
-  const handleGeneratePinClick = () => {
-    setIsPinModalOpen(true);
-    onGeneratePin?.();
+  const { launchSdk } = useCardSdk();
+
+  useEffect(() => {
+    setIsEnabled(initialEnabled);
+  }, [initialEnabled]);
+
+  useEffect(() => {
+    setIsLocked(initialLocked);
+  }, [initialLocked]);
+
+  const handleGeneratePinClick = async () => {
+    setPinError(null);
+    setIsLaunchingPin(true);
+    try {
+      await launchSdk();
+      onGeneratePin?.();
+    } catch (err: unknown) {
+      setPinError(err instanceof Error ? err.message : "Failed to open official Card SDK.");
+    } finally {
+      setIsLaunchingPin(false);
+    }
   };
 
-  const handleToggleEnabled = () => {
+  const handleToggleEnabled = async () => {
     const next = !isEnabled;
     setIsEnabled(next);
-    onToggleEnabled?.(next);
+    try {
+      await onToggleEnabled?.(next);
+    } catch {
+      setIsEnabled(!next);
+    }
   };
 
-  const handleToggleLock = () => {
+  const handleToggleLock = async () => {
     const next = !isLocked;
     setIsLocked(next);
-    onToggleLock?.(next);
+    try {
+      await onToggleLock?.(next);
+    } catch {
+      setIsLocked(!next);
+    }
   };
 
   return (
@@ -46,7 +76,7 @@ export const CardControls: React.FC<CardControlsProps> = ({
           Card Controls
         </h3>
         <p className="text-xs sm:text-sm text-[#737380] mt-1">
-          Manage your card PIN, usage, and lock status from one place.
+          Manage your card PIN, usage, and lock status securely via RuPay Core.
         </p>
       </div>
 
@@ -57,15 +87,23 @@ export const CardControls: React.FC<CardControlsProps> = ({
           <div>
             <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Generate PIN</h4>
             <p className="text-xs text-[#737380] mt-0.5 leading-tight">
-              Set your card PIN
+              PCI-DSS Secure PIN
             </p>
           </div>
           <div>
             <Button
               onClick={handleGeneratePinClick}
-              className="h-[30px] px-3.5 text-xs font-semibold rounded-[6px] shadow-none"
+              disabled={isLaunchingPin}
+              className="h-[30px] px-3.5 text-xs font-semibold rounded-[6px] shadow-none bg-[#DB6516] hover:bg-[#c45710] text-white flex items-center gap-1.5 cursor-pointer"
             >
-              Generate PIN
+              {isLaunchingPin ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                "Set PIN"
+              )}
             </Button>
           </div>
         </div>
@@ -74,8 +112,8 @@ export const CardControls: React.FC<CardControlsProps> = ({
         <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
             <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Enable / Disable</h4>
-            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
-              Toggle card usage
+            <p className="text-xs font-medium text-[#737380] mt-0.5 leading-tight">
+              {isEnabled ? "Card Active" : "Card Disabled"}
             </p>
           </div>
           <div className="flex items-center">
@@ -101,8 +139,8 @@ export const CardControls: React.FC<CardControlsProps> = ({
         <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
             <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Lock Card</h4>
-            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
-              Permanent Lock
+            <p className="text-xs font-medium text-[#737380] mt-0.5 leading-tight">
+              {isLocked ? "Card Locked" : "Card Unlocked"}
             </p>
           </div>
           <div className="flex items-center">
@@ -125,12 +163,15 @@ export const CardControls: React.FC<CardControlsProps> = ({
         </div>
       </div>
 
-      {/* Generate PIN Flow Modal */}
-      <GeneratePinModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-      />
+      {pinError && (
+        <div className="mt-3 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+          <span>{pinError}</span>
+        </div>
+      )}
     </div>
   );
 };
+
+
 

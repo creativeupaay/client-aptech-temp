@@ -19,7 +19,7 @@ import {
   useGetCardQuery,
   useGetFullKycUrlMutation,
   useCheckKycStatusQuery,
-  useCompleteFullKycMutation,
+  useMockCompleteFullKycMutation,
 } from "./cardApi";
 import { KycUpgradedSuccessModal } from "./components/KycUpgradedSuccessModal";
 
@@ -31,15 +31,15 @@ export const KycVerificationPage: React.FC = () => {
   const { data: kycStatusData, refetch: refetchKycStatus } = useCheckKycStatusQuery();
 
   const [getFullKycUrlMutation, { isLoading: isGeneratingUrl }] = useGetFullKycUrlMutation();
-  const [completeFullKycMutation, { isLoading: isUpgradingFastTrack }] = useCompleteFullKycMutation();
+  const [mockCompleteFullKyc, { isLoading: isMockUpgrading }] = useMockCompleteFullKycMutation();
 
   const user = meData?.data?.user;
   const card = cardRes?.data?.card;
   const isAlreadyFullKyc =
     card?.kycStatus === "FULL_KYC" || kycStatusData?.data?.kycStatus === "FULL_KYC";
 
-  const studentName = user?.name || "Aarav Sharma";
-  const studentId = user?.studentId || "APT-2026-00417";
+  const studentName = user?.name || "Student";
+  const studentId = user?.studentId || "";
   const initials =
     studentName
       .split(" ")
@@ -47,7 +47,7 @@ export const KycVerificationPage: React.FC = () => {
       .filter(Boolean)
       .join("")
       .slice(0, 2)
-      .toUpperCase() || "AS";
+      .toUpperCase() || "ST";
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -75,7 +75,13 @@ export const KycVerificationPage: React.FC = () => {
 
       if (!targetUrl) {
         // KYC already complete
-        refetchKycStatus();
+        await refetchKycStatus();
+        return;
+      }
+
+      // Direct redirection to Oxymoney e-KYC portal
+      if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+        window.location.href = targetUrl;
         return;
       }
 
@@ -91,21 +97,21 @@ export const KycVerificationPage: React.FC = () => {
     }
   };
 
-  // Simulate completion inside sandbox modal (or fallback fast-track)
-  const handleSandboxSimulateSuccess = async () => {
+  // Mock Full KYC Verification & Upgrade
+  const handleMockKycUpgrade = async () => {
+    setErrorMessage(null);
     try {
-      await completeFullKycMutation({
-        aadhaarNumber: "123456789012",
-        aadhaarOtp: "123456",
-        panNumber: "ABCDE1234F",
-      }).unwrap();
+      await mockCompleteFullKyc().unwrap();
+      await refetchKycStatus();
       setIsSandboxModalOpen(false);
       setShowSuccessModal(true);
     } catch (err: unknown) {
       interface ErrData {
         data?: { message?: string };
       }
-      setErrorMessage((err as ErrData)?.data?.message || "Sandbox verification failed.");
+      setErrorMessage(
+        (err as ErrData)?.data?.message || "Mock Full KYC verification failed. Please try again."
+      );
     }
   };
 
@@ -295,13 +301,14 @@ export const KycVerificationPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Primary Action Button */}
-              <div className="pt-3">
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-4">
+                {/* Official Gateway Button */}
                 <button
                   type="button"
                   onClick={handleLaunchKycPortal}
-                  disabled={isGeneratingUrl}
-                  className="w-full h-12 bg-[#DB6516] hover:bg-[#C05510] text-white font-bold rounded-xl shadow-xs transition active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer text-sm sm:text-base"
+                  disabled={isGeneratingUrl || isMockUpgrading}
+                  className="w-full h-12 bg-[#DB6516] hover:bg-[#C05510] active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-sm sm:text-base"
                 >
                   {isGeneratingUrl ? (
                     <>
@@ -315,22 +322,44 @@ export const KycVerificationPage: React.FC = () => {
                     </>
                   )}
                 </button>
-              </div>
 
-              {/* Developer Sandbox Fast-Track Option */}
-              <div className="border-t border-gray-100 pt-4 flex items-center justify-between text-xs text-gray-500">
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Sandbox Environment Active</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSandboxSimulateSuccess}
-                  disabled={isUpgradingFastTrack}
-                  className="text-[#DB6516] font-semibold hover:underline cursor-pointer disabled:opacity-50"
-                >
-                  {isUpgradingFastTrack ? "Simulating..." : "Fast-Track Verify (Sandbox)"}
-                </button>
+                {/* Mock KYC Verification (Development & Testing Option) */}
+                <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-4 sm:p-5 text-xs text-amber-900 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#DB6516]" />
+                      <span className="font-bold text-sm text-[#1C1C21]">
+                        Mock KYC Verification & Upgrade
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
+                      Dev / Mock Mode
+                    </span>
+                  </div>
+                  <p className="text-gray-600 leading-relaxed text-[12px]">
+                    Test the Full KYC upgrade instantly without leaving this page. This mocks the Aadhaar e-KYC verification and immediately upgrades your RuPay card limit to ₹2,00,000.
+                  </p>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleMockKycUpgrade}
+                      disabled={isMockUpgrading || isGeneratingUrl}
+                      className="w-full sm:w-auto px-5 h-10 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+                    >
+                      {isMockUpgrading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Upgrading to Full KYC...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Mock Verify & Upgrade to Full KYC (₹2,00,000)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -366,11 +395,11 @@ export const KycVerificationPage: React.FC = () => {
             <div className="mt-6 space-y-2.5">
               <button
                 type="button"
-                onClick={handleSandboxSimulateSuccess}
-                disabled={isUpgradingFastTrack}
+                onClick={handleMockKycUpgrade}
+                disabled={isMockUpgrading}
                 className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition cursor-pointer flex items-center justify-center gap-2"
               >
-                {isUpgradingFastTrack ? (
+                {isMockUpgrading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>

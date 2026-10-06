@@ -5,7 +5,8 @@ import {
   rupayPrepaidLogo,
 } from "../../../assets/dashboard";
 import { Button } from "../../../components/ui";
-import { CardSdkViewerModal } from "../../card/components/CardSdkViewerModal";
+import { useCardSdk } from "../../card";
+import { Loader2, Lock, AlertCircle } from "lucide-react";
 
 interface CardSectionProps {
   holderName?: string;
@@ -13,6 +14,8 @@ interface CardSectionProps {
   maskedPan?: string;
   expiry?: string;
   cvv?: string;
+  isLocked?: boolean;
+  isCardEnabled?: boolean;
   onViewDetails?: () => void;
 }
 
@@ -90,20 +93,33 @@ const ContactlessWaves: React.FC = () => (
 );
 
 export const CardSection: React.FC<CardSectionProps> = ({
-  holderName = "Aarav Sharma",
+  holderName = "Cardholder",
   cardNumber,
-  maskedPan = "•••• •••• •••• 8942",
+  maskedPan = "•••• •••• •••• ••••",
   expiry = "••/••",
+  isLocked = false,
+  isCardEnabled = true,
   onViewDetails,
 }) => {
-  const [isSdkModalOpen, setIsSdkModalOpen] = useState(false);
+  const { launchSdk } = useCardSdk();
+  const [isLaunchingSdk, setIsLaunchingSdk] = useState(false);
+  const [sdkError, setSdkError] = useState<string | null>(null);
 
-  const handleToggleDetails = () => {
+  const handleToggleDetails = async () => {
     if (onViewDetails) {
       onViewDetails();
       return;
     }
-    setIsSdkModalOpen(true);
+
+    setSdkError(null);
+    setIsLaunchingSdk(true);
+    try {
+      await launchSdk();
+    } catch (err: unknown) {
+      setSdkError(err instanceof Error ? err.message : "Failed to open official Card SDK.");
+    } finally {
+      setIsLaunchingSdk(false);
+    }
   };
 
   return (
@@ -128,13 +144,28 @@ export const CardSection: React.FC<CardSectionProps> = ({
         {/* Soft overlay */}
         <div className="absolute inset-0 bg-black/5 pointer-events-none" />
 
-        {/* Top: Aptech Brand Logo */}
+        {/* Top: Aptech Brand Logo + Live Status Chip */}
         <div className="relative z-10 flex items-start justify-between">
           <img
             src={aptechLogo}
             alt="Aptech - Unleash your potential"
             className="h-8 sm:h-9 object-contain drop-shadow-xs"
           />
+          <div className="flex items-center gap-1.5">
+            {isLocked ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-red-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                <Lock className="w-3 h-3" /> Card Locked
+              </span>
+            ) : !isCardEnabled ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                ⏸ Card Paused
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                ● Active
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Middle Section: Cardholder Name, Chip & Contactless */}
@@ -158,7 +189,7 @@ export const CardSection: React.FC<CardSectionProps> = ({
           {/* Card Number: Masked PAN */}
           <div className="mt-2.5">
             <div className="font-mono text-base sm:text-lg font-bold tracking-[0.16em] sm:tracking-[0.2em] text-white drop-shadow-xs">
-              {maskedPan || cardNumber || "•••• •••• •••• 8942"}
+              {maskedPan || cardNumber || "•••• •••• •••• ••••"}
             </div>
           </div>
         </div>
@@ -198,22 +229,30 @@ export const CardSection: React.FC<CardSectionProps> = ({
         </div>
       </div>
 
-      {/* View Card Details Button */}
+      {/* View Card Details Button — directly triggers actual CardSDK */}
       <Button
         onClick={handleToggleDetails}
-        className="w-full h-[40px] text-xs sm:text-sm font-semibold rounded-lg text-center shadow-2xs"
+        disabled={isLaunchingSdk}
+        className="w-full h-[40px] text-xs sm:text-sm font-semibold rounded-lg text-center shadow-2xs cursor-pointer flex items-center justify-center gap-2"
       >
-        View Card Details
+        {isLaunchingSdk ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Opening Official Card SDK...</span>
+          </>
+        ) : (
+          "View Card Details"
+        )}
       </Button>
 
-      {/* PCI-DSS Scoped Card SDK Modal */}
-      <CardSdkViewerModal
-        isOpen={isSdkModalOpen}
-        onClose={() => setIsSdkModalOpen(false)}
-        maskedPan={maskedPan || cardNumber || "•••• •••• •••• 8942"}
-        holderName={holderName}
-      />
+      {sdkError && (
+        <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+          <span>{sdkError}</span>
+        </div>
+      )}
     </div>
   );
 };
+
 

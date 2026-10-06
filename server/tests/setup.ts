@@ -2,6 +2,9 @@ import { beforeAll, afterAll, afterEach } from "vitest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 
+process.env.NODE_ENV = "test";
+process.env.TRANSBNK_PROVIDER = "mock";
+
 let mongoServer: MongoMemoryServer;
 
 beforeAll(async () => {

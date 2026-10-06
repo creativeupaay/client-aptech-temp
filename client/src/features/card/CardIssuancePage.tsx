@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Check, CheckCircle2, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Bell, Check, Loader2, AlertCircle } from "lucide-react";
 import { useGetMeQuery } from "../auth/authApi";
 import {
   useSendCardOtpMutation,
@@ -19,10 +19,10 @@ export const CardIssuancePage: React.FC = () => {
     useRegisterAndIssueCardMutation();
 
   const user = meData?.data?.user;
-  const studentName = user?.name || "Aarav Sharma";
-  const studentId = user?.studentId || "APT-2026-00417";
-  const userMobile = user?.mobile ? user.mobile.replace(/\D/g, "").slice(-10) : "9987657875";
-  const userEmail = user?.email || "aarav@example.com";
+  const studentName = user?.name || "Student";
+  const studentId = user?.studentId || "";
+  const userMobile = user?.mobile ? user.mobile.replace(/\D/g, "").slice(-10) : "";
+  const userEmail = user?.email || "";
 
   const initials =
     studentName
@@ -46,7 +46,7 @@ export const CardIssuancePage: React.FC = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [countdown, setCountdown] = useState(45);
-  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const isOtpComplete = otp.every((d) => d.length === 1);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -63,6 +63,14 @@ export const CardIssuancePage: React.FC = () => {
     if (user?.email) setEmail(user.email);
     if (user?.mobile) setMobile(user.mobile.replace(/\D/g, "").slice(-10));
   }, [user]);
+
+  // If card is already issued or currently being provisioned, redirect directly to status screen
+  useEffect(() => {
+    const status = cardData?.data?.card?.status;
+    if (status === "ACTIVE" || status === "APPLICATION_PENDING" || status === "ISSUED") {
+      navigate("/card/status", { replace: true });
+    }
+  }, [cardData?.data?.card?.status, navigate]);
 
   // Validation functions
   const validateField = (field: string, value: string, currentGovType = govIdType): string | null => {
@@ -225,15 +233,39 @@ export const CardIssuancePage: React.FC = () => {
   };
 
   const handleDobChange = (val: string) => {
-    const digits = val.replace(/\D/g, "").slice(0, 8);
-    let formatted = "";
-    if (digits.length <= 2) {
-      formatted = digits;
-    } else if (digits.length <= 4) {
-      formatted = `${digits.slice(0, 2)} / ${digits.slice(2)}`;
-    } else {
-      formatted = `${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4, 8)}`;
+    const isDeleting = val.length < dob.length;
+    let digits = val.replace(/\D/g, "").slice(0, 8);
+
+    // If backspacing and string previously ended with " / " or "/", drop the trailing digit
+    if (isDeleting && (dob.endsWith(" / ") || dob.endsWith("/ ") || dob.endsWith("/"))) {
+      digits = digits.slice(0, -1);
     }
+
+    let formatted = "";
+    if (isDeleting) {
+      if (digits.length <= 2) {
+        formatted = digits;
+      } else if (digits.length <= 4) {
+        formatted = `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+      } else {
+        formatted = `${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4)}`;
+      }
+    } else {
+      if (digits.length < 2) {
+        formatted = digits;
+      } else if (digits.length === 2) {
+        // As soon as 2 digits are entered (e.g. 12), immediately append " / "
+        formatted = `${digits} / `;
+      } else if (digits.length < 4) {
+        formatted = `${digits.slice(0, 2)} / ${digits.slice(2)}`;
+      } else if (digits.length === 4) {
+        // As soon as 4 digits are entered (e.g. 12 / 11), immediately append " / "
+        formatted = `${digits.slice(0, 2)} / ${digits.slice(2, 4)} / `;
+      } else {
+        formatted = `${digits.slice(0, 2)} / ${digits.slice(2, 4)} / ${digits.slice(4)}`;
+      }
+    }
+
     setDob(formatted);
     if (touched.dob) {
       const err = validateField("dob", formatted);
@@ -265,7 +297,6 @@ export const CardIssuancePage: React.FC = () => {
       setOtpSent(true);
       setCountdown(45);
       setOtp(["", "", "", "", "", ""]);
-      setIsOtpVerified(false);
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
       }, 100);
@@ -288,12 +319,6 @@ export const CardIssuancePage: React.FC = () => {
     if (digit && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
     }
-
-    if (newOtp.every((d) => d.length === 1)) {
-      setIsOtpVerified(true);
-    } else {
-      setIsOtpVerified(false);
-    }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -302,30 +327,7 @@ export const CardIssuancePage: React.FC = () => {
     }
   };
 
-  const handleQuickFillOtp = () => {
-    setOtp(["3", "8", "1", "6", "4", "2"]);
-    setIsOtpVerified(true);
-  };
 
-  const handleAutoFillDemo = () => {
-    setName("Aarav Sharma");
-    setEmail("aarav@example.com");
-    setMobile("9987657875");
-    setGovIdType("AADHAR_NUMBER");
-    setGovIdValue("2399 9988 8895");
-    setDob("17 / 11 / 1998");
-    setTermsAccepted(true);
-    setErrors({});
-    setTouched({
-      name: true,
-      email: true,
-      mobile: true,
-      govIdValue: true,
-      dob: true,
-      termsAccepted: true,
-    });
-    setErrorMessage(null);
-  };
 
   const handleSubmitIssuance = async () => {
     // Mark all fields touched
@@ -361,8 +363,8 @@ export const CardIssuancePage: React.FC = () => {
       return;
     }
 
-    if (!isOtpVerified) {
-      setErrorMessage("Please complete mobile number verification with OTP first.");
+    if (!isOtpComplete) {
+      setErrorMessage("Please enter the complete 6-digit verification OTP received on your mobile.");
       return;
     }
 
@@ -391,7 +393,7 @@ export const CardIssuancePage: React.FC = () => {
         termsAccepted: true,
       }).unwrap();
 
-      navigate("/dashboard", { replace: true });
+      navigate("/card/status", { replace: true });
     } catch (err: unknown) {
       interface ErrData {
         data?: { message?: string; errors?: Array<{ field: string; message: string }> };
@@ -432,25 +434,17 @@ export const CardIssuancePage: React.FC = () => {
     }
   };
 
-  // If card is already issued and active, show helpful banner with link back to dashboard
-  if (cardData?.data?.card?.status === "ACTIVE") {
+  // If card is already issued or application pending, redirect cleanly to /card/status
+  if (
+    cardData?.data?.card?.status === "ACTIVE" ||
+    cardData?.data?.card?.status === "ISSUED" ||
+    cardData?.data?.card?.status === "APPLICATION_PENDING"
+  ) {
     return (
-      <div className="min-h-screen bg-[#F4F5F7] flex flex-col items-center justify-center p-4 font-sans">
-        <div className="bg-white p-8 rounded-2xl border border-gray-200/80 shadow-xs max-w-md w-full text-center space-y-4">
-          <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900">Card Already Active</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            You already have an active AP-Tech RuPay Prepaid Card linked to this account.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            className="w-full h-11 bg-[#DB6516] hover:bg-[#C05510] text-white font-bold rounded-xl transition cursor-pointer"
-          >
-            Return to Dashboard
-          </button>
+      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center p-4 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-[#DB6516] animate-spin" />
+          <p className="text-sm font-medium text-gray-500">Opening card status...</p>
         </div>
       </div>
     );
@@ -495,26 +489,14 @@ export const CardIssuancePage: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-[1200px] w-full mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col">
-        {/* Title Section with Demo Fill Helper */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#1C1C21] tracking-tight">
-              Card Issuance
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Enter your details to issue your AP-Tech RuPay Prepaid Card.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAutoFillDemo}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-semibold rounded-full transition cursor-pointer self-start sm:self-auto"
-            title="Click to populate demo details for testing"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Fill Demo Details</span>
-          </button>
+        {/* Title Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#1C1C21] tracking-tight">
+            Card Issuance
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Enter your details to issue your AP-Tech RuPay Prepaid Card.
+          </p>
         </div>
 
         {errorMessage && (
@@ -773,18 +755,9 @@ export const CardIssuancePage: React.FC = () => {
 
                 {otpSent && (
                   <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-semibold text-gray-700">
-                        Enter 6-Digit OTP
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleQuickFillOtp}
-                        className="text-[11px] text-[#DB6516] hover:underline font-semibold cursor-pointer"
-                      >
-                        Quick fill: 381642
-                      </button>
-                    </div>
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Enter 6-Digit OTP
+                    </label>
 
                     <div className="flex items-center gap-2 sm:gap-3">
                       {otp.map((digit, idx) => (
@@ -799,11 +772,7 @@ export const CardIssuancePage: React.FC = () => {
                           value={digit}
                           onChange={(e) => handleOtpChange(idx, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(idx, e)}
-                          className={`w-10 sm:w-12 h-12 text-center text-lg font-bold border rounded-xl outline-hidden transition bg-white text-gray-900 ${
-                            isOtpVerified
-                              ? "border-emerald-500 bg-emerald-50/20"
-                              : "border-gray-300 focus:border-[#DB6516] focus:ring-1 focus:ring-[#DB6516]"
-                          }`}
+                          className="w-10 sm:w-12 h-12 text-center text-lg font-bold border border-gray-300 rounded-xl outline-hidden transition bg-white text-gray-900 focus:border-[#DB6516] focus:ring-1 focus:ring-[#DB6516]"
                         />
                       ))}
                     </div>
@@ -821,13 +790,6 @@ export const CardIssuancePage: React.FC = () => {
                         00:{countdown < 10 ? `0${countdown}` : countdown}
                       </span>
                     </div>
-
-                    {isOtpVerified && (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-[#E6F8F0] border border-[#B9EED9] text-[#10B981] rounded-xl text-xs font-semibold animate-fade-in">
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>Mobile number verified successfully</span>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -897,9 +859,9 @@ export const CardIssuancePage: React.FC = () => {
                   <span>Submit & Issue Card</span>
                 )}
               </button>
-              {(!isOtpVerified || !termsAccepted || !govIdValue.trim() || !dob.trim()) && (
+              {(!isOtpComplete || !termsAccepted || !govIdValue.trim() || !dob.trim()) && (
                 <p className="text-center text-xs text-gray-400 mt-2">
-                  All fields marked with <span className="text-[#DB6516]">*</span> and mobile OTP verification are mandatory.
+                  All fields marked with <span className="text-[#DB6516]">*</span> and 6-digit mobile OTP are mandatory.
                 </p>
               )}
             </div>
