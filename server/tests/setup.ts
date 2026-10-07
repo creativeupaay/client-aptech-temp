@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 process.env.NODE_ENV = "test";
 process.env.TRANSBNK_PROVIDER = "mock";
 
+import { disconnectRedis } from "../src/config/redis.js";
+
 let mongoServer: MongoMemoryServer;
 
 beforeAll(async () => {
@@ -30,6 +32,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await disconnectRedis();
   // Disconnect and terminate in-memory database
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();

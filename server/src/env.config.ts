@@ -68,6 +68,16 @@ const envSchema = z.object({
   APTECH_COIN_PROVIDER: z
     .enum(["mock", "http"])
     .default("http"),
+  REDIS_URL: z
+    .string()
+    .default(process.env.REDIS_URL || "redis://127.0.0.1:6379"),
+  REDIS_KEY_PREFIX: z
+    .string()
+    .default(process.env.REDIS_KEY_PREFIX || "aptech:"),
+  REDIS_ENABLED: z
+    .string()
+    .default(process.env.REDIS_ENABLED || "true")
+    .transform((val) => val === "true" || val === "1"),
   HUBBLE_CLIENT_ID: z
     .string()
     .default(process.env.HUBBLE_CLIENT_ID || "tbx-cards-loyalty-dev-sdk-fqlxyqb3"),

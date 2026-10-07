@@ -8,6 +8,8 @@ import { ProconnectFactory } from "../../services/proconnect/index.js";
 import { AptrackFactory } from "../../services/aptrack/index.js";
 import { User } from "../user/user.model.js";
 import { env } from "../../env.config.js";
+import { withDistributedLock } from "../../utils/distributedLock.js";
+import { CacheService } from "../../utils/cache.js";
 import type {
   CompleteFullKycInput,
   LoadMoneyInput,
@@ -407,6 +409,14 @@ export class CardService {
       return card;
     }
 
+    const pollThrottleKey = `tb:poll:${card.referenceId}`;
+    const isThrottled = await CacheService.get<boolean>(pollThrottleKey);
+    if (isThrottled) {
+      return card;
+    }
+    // Set 2-second buffer window
+    await CacheService.set(pollThrottleKey, true, 2);
+
     const transbank = TransbankFactory.getProvider();
     try {
       const statusResult = await transbank.getCardCreationStatus({
@@ -509,11 +519,12 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (card.status !== "ACTIVE" && card.status !== "ISSUED") {
-      throw ApiError.badRequest(
-        "Card is not active. Please complete card issuance before adding funds."
-      );
-    }
+    return await withDistributedLock(`card:load:${card._id.toString()}`, async () => {
+      if (card.status !== "ACTIVE" && card.status !== "ISSUED") {
+        throw ApiError.badRequest(
+          "Card is not active. Please complete card issuance before adding funds."
+        );
+      }
 
     if (!card.cardId) {
       throw ApiError.badRequest(
@@ -655,6 +666,7 @@ export class CardService {
     await pendingTx.save();
 
     return { transaction: pendingTx, card: updatedCard };
+    }, { ttlMs: 8000 });
   }
 
   /**

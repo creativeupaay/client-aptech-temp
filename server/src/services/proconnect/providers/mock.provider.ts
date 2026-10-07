@@ -42,7 +42,7 @@ export class MockProconnectProvider implements IProconnectService {
   }
 
   /**
-   * Generates a single-use authorization code with 2-minute expiration for a student profile.
+   * Generates a single-use authorization code with 60-second expiration for a student profile.
    */
   public async generateMockCode(customProfile?: Partial<ProconnectStudentProfile>): Promise<string> {
     const code = `pc_auth_${crypto.randomBytes(16).toString("hex")}`;
@@ -55,7 +55,7 @@ export class MockProconnectProvider implements IProconnectService {
 
     this.codeStore.set(code, {
       profile,
-      expiresAt: Date.now() + 2 * 60 * 1000, // 2 minutes TTL
+      expiresAt: Date.now() + 60 * 1000,
     });
 
     return code;
@@ -66,20 +66,17 @@ export class MockProconnectProvider implements IProconnectService {
    */
   public async exchangeCode(code: string): Promise<ProconnectStudentProfile> {
     const entry = this.codeStore.get(code);
-
     if (!entry) {
-      throw ApiError.badRequest("Invalid or expired authorization code. Please initiate SSO again.");
+      throw ApiError.badRequest(
+        "Invalid or expired authorization code. Please initiate SSO again."
+      );
     }
+
+    // Burn code immediately (single-use)
+    this.codeStore.delete(code);
 
     if (Date.now() > entry.expiresAt) {
-      this.codeStore.delete(code);
       throw ApiError.badRequest("Authorization code has expired. Please initiate SSO again.");
-    }
-
-    // Crucial security requirement: burn code immediately to prevent replay
-    // Keep the permanent demo code renewable if it's the exact demo code, but for real codes delete immediately
-    if (code !== "demo_proconnect_auth_code_2026") {
-      this.codeStore.delete(code);
     }
 
     return entry.profile;

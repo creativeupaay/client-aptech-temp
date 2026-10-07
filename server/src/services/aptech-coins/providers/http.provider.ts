@@ -1,5 +1,6 @@
 import { env } from "../../../env.config.js";
 import { ApiError } from "../../../utils/ApiError.js";
+import { CacheService } from "../../../utils/cache.js";
 import type {
   IAptechCoinService,
   AptechCoinBalanceResult,
@@ -17,6 +18,12 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
   }
 
   public async getBalance(studentId: string): Promise<AptechCoinBalanceResult> {
+    const cacheKey = `coins:balance:${studentId}`;
+    const cached = await CacheService.get<AptechCoinBalanceResult>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const url = `${this.baseUrl}/balance?studentId=${encodeURIComponent(studentId)}`;
       const res = await fetch(url, {
@@ -35,11 +42,16 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
         throw new Error(json.message || `Failed to fetch balance from Aptech: ${res.statusText}`);
       }
 
-      return {
+      const balanceResult: AptechCoinBalanceResult = {
         studentId: json.data.studentId || studentId,
         balance: json.data.balance ?? 0,
         currency: json.data.currency || "POINTS",
       };
+
+      // Cache balance for 30 seconds
+      await CacheService.set(cacheKey, balanceResult, 30);
+
+      return balanceResult;
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
       if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
@@ -78,6 +90,9 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
         }
         throw new Error(json.message || `Failed to debit coins from Aptech: ${res.statusText}`);
       }
+
+      // Smart Invalidation: Evict cached balance immediately upon debit
+      await CacheService.del(`coins:balance:${input.studentId}`);
 
       return {
         studentId: json.data.studentId || input.studentId,
@@ -122,6 +137,9 @@ export class HttpAptechCoinProvider implements IAptechCoinService {
       if (!res.ok || !json.success || !json.data) {
         throw new Error(json.message || `Failed to reverse coins at Aptech: ${res.statusText}`);
       }
+
+      // Smart Invalidation: Evict cached balance immediately upon reversal
+      await CacheService.del(`coins:balance:${input.studentId}`);
 
       return {
         studentId: json.data.studentId || input.studentId,

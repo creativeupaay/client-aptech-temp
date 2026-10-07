@@ -2,6 +2,7 @@ import { type Server } from "http";
 import app from "./app.js";
 import { env } from "./env.config.js";
 import { connectDB, disconnectDB } from "./config/db.config.js";
+import { connectRedis, disconnectRedis } from "./config/redis.js";
 
 // Initialized with live TransBnk configuration
 let server: Server | null = null;
@@ -25,7 +26,7 @@ const handleShutdown = async (signal: string): Promise<void> => {
       });
     }
 
-    await disconnectDB();
+    await Promise.allSettled([disconnectDB(), disconnectRedis()]);
     clearTimeout(forceExitTimeout);
     console.log("[Server] Graceful shutdown completed.");
     process.exit(0);
@@ -37,8 +38,9 @@ const handleShutdown = async (signal: string): Promise<void> => {
 
 const startServer = async (): Promise<void> => {
   try {
-    // 1. Establish database connection before accepting traffic
+    // 1. Establish database & Redis connections before accepting traffic
     await connectDB();
+    await connectRedis();
 
     // 2. Start HTTP server
     server = app.listen(env.PORT, () => {

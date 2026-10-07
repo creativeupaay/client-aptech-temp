@@ -6,6 +6,7 @@ import { VoucherRedemption, type VoucherStatus } from "./voucherRedemption.model
 import { DebitTransaction } from "./debitTransaction.model.js";
 import { AptechCoinFactory } from "../../services/aptech-coins/index.js";
 import { encryptSensitive, decryptSensitive } from "../../utils/crypto.js";
+import { withDistributedLock } from "../../utils/distributedLock.js";
 import type {
   BalanceQueryInput,
   DebitCoinsInput,
@@ -206,84 +207,91 @@ export class HubbleService {
       throw ApiError.badRequest("Debit amount must be a positive number.");
     }
 
-    // 1. Idempotency Check: Prevent duplicate debit on network timeouts / retries
-    const targetTxnId = input.transactionId || input.referenceId || input.orderId;
-    if (targetTxnId) {
-      const existingDebit = await DebitTransaction.findOne({
-        $or: [
-          { transactionId: targetTxnId },
-          { referenceId: targetTxnId },
-          ...(input.orderId ? [{ orderId: input.orderId }] : []),
-        ],
+    return await withDistributedLock(
+      `coins:debit:${studentId}`,
+      async () => {
+      // 1. Idempotency Check: Prevent duplicate debit on network timeouts / retries
+      const targetTxnId = input.transactionId || input.referenceId || input.orderId;
+      if (targetTxnId) {
+        const existingDebit = await DebitTransaction.findOne({
+          $or: [
+            { transactionId: targetTxnId },
+            { referenceId: targetTxnId },
+            ...(input.orderId ? [{ orderId: input.orderId }] : []),
+          ],
+        });
+
+        if (existingDebit) {
+          return {
+            status: "SUCCESS",
+            transactionId: existingDebit.transactionId,
+            referenceId: existingDebit.referenceId || targetTxnId,
+            totalCoins: existingDebit.remainingBalance ?? 0,
+            coins: existingDebit.remainingBalance ?? 0,
+            debitedCoins: existingDebit.amount,
+            debitedAmount: existingDebit.amount,
+            remainingBalance: existingDebit.remainingBalance ?? 0,
+            balance: existingDebit.remainingBalance ?? 0,
+            userId: existingDebit.userId.toString(),
+            studentId: existingDebit.studentId,
+            isIdempotent: true,
+          };
+        }
+      }
+
+      // Proxy debit to Aptech Coin API
+      const debitResult = await AptechCoinFactory.getProvider().debitCoins({
+        studentId,
+        amount,
+        transactionId: input.transactionId ?? undefined,
+        referenceId: (input.referenceId || input.orderId) ?? undefined,
+        brandName: input.brandName ?? undefined,
+        orderId: input.orderId ?? undefined,
       });
 
-      if (existingDebit) {
-        return {
-          status: "SUCCESS",
-          transactionId: existingDebit.transactionId,
-          referenceId: existingDebit.referenceId || targetTxnId,
-          totalCoins: existingDebit.remainingBalance ?? 0,
-          coins: existingDebit.remainingBalance ?? 0,
-          debitedCoins: existingDebit.amount,
-          debitedAmount: existingDebit.amount,
-          remainingBalance: existingDebit.remainingBalance ?? 0,
-          balance: existingDebit.remainingBalance ?? 0,
-          userId: existingDebit.userId.toString(),
-          studentId: existingDebit.studentId,
-          isIdempotent: true,
-        };
-      }
-    }
+      const transactionId = debitResult.transactionId;
+      const referenceId = debitResult.referenceId || (input.orderId ?? undefined) || transactionId;
 
-    // Proxy debit to Aptech Coin API
-    const debitResult = await AptechCoinFactory.getProvider().debitCoins({
-      studentId,
-      amount,
-      transactionId: input.transactionId ?? undefined,
-      referenceId: (input.referenceId || input.orderId) ?? undefined,
-      brandName: input.brandName ?? undefined,
-      orderId: input.orderId ?? undefined,
-    });
-
-    const transactionId = debitResult.transactionId;
-    const referenceId = debitResult.referenceId || (input.orderId ?? undefined) || transactionId;
-
-    // Persist debit transaction record for audit and reversal idempotency
-    try {
-      await DebitTransaction.findOneAndUpdate(
-        { transactionId },
-        {
-          $setOnInsert: {
-            transactionId,
-            studentId,
-            userId: user._id,
-            amount: debitResult.debitedAmount,
-            remainingBalance: debitResult.remainingBalance,
-            status: "DEBITED",
-            orderId: input.orderId ?? undefined,
-            referenceId,
-            brandName: input.brandName ?? undefined,
+      // Persist debit transaction record for audit and reversal idempotency
+      try {
+        await DebitTransaction.findOneAndUpdate(
+          { transactionId },
+          {
+            $setOnInsert: {
+              transactionId,
+              studentId,
+              userId: user._id,
+              amount: debitResult.debitedAmount,
+              remainingBalance: debitResult.remainingBalance,
+              status: "DEBITED",
+              orderId: input.orderId ?? undefined,
+              referenceId,
+              brandName: input.brandName ?? undefined,
+            },
           },
-        },
-        { upsert: true, returnDocument: "after" }
-      );
-    } catch (err) {
-      console.warn(`[DebitTransaction] Could not save audit record for ${transactionId}:`, err);
-    }
+          { upsert: true, returnDocument: "after" }
+        );
+      } catch (err) {
+        console.warn(`[DebitTransaction] Could not save audit record for ${transactionId}:`, err);
+      }
 
-    return {
-      status: "SUCCESS",
-      transactionId,
-      referenceId,
-      totalCoins: debitResult.remainingBalance,
-      coins: debitResult.remainingBalance,
-      debitedCoins: debitResult.debitedAmount,
-      debitedAmount: debitResult.debitedAmount,
-      remainingBalance: debitResult.remainingBalance,
-      balance: debitResult.remainingBalance,
-      userId: user._id.toString(),
-      studentId,
-    };
+      return {
+        status: "SUCCESS",
+        transactionId,
+        referenceId,
+        totalCoins: debitResult.remainingBalance,
+        coins: debitResult.remainingBalance,
+        debitedCoins: debitResult.debitedAmount,
+        debitedAmount: debitResult.debitedAmount,
+        remainingBalance: debitResult.remainingBalance,
+        balance: debitResult.remainingBalance,
+        userId: user._id.toString(),
+        studentId,
+      };
+    }, {
+      ttlMs: 6000,
+      customErrorMessage: "Transaction currently in progress for this student. Please retry shortly.",
+    });
   }
 
   /**
@@ -296,7 +304,10 @@ export class HubbleService {
       throw ApiError.badRequest("Transaction ID or reference ID is required for reversal.");
     }
 
-    // Verify whether this transaction was actually debited before
+    return await withDistributedLock(
+      `coins:reverse:${targetRef}`,
+      async () => {
+      // Verify whether this transaction was actually debited before
     const existingDebit = await DebitTransaction.findOne({
       $or: [
         { transactionId: targetRef },
@@ -437,6 +448,10 @@ export class HubbleService {
       userId: user._id.toString(),
       studentId,
     };
+    }, {
+      ttlMs: 6000,
+      customErrorMessage: "Reversal currently in progress for this transaction. Please retry shortly.",
+    });
   }
 
   /**
