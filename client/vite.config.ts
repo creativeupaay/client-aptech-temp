@@ -1,6 +1,6 @@
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 /**
  * Local development mock proxy plugin for @oxymoney/cardsdk-web.
@@ -226,40 +226,50 @@ function cardSdkDevPlugin(): Plugin {
   };
 }
 
-const useRemoteOxySandbox = process.env.VITE_USE_REMOTE_OXY_SANDBOX === "true";
-
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    react(),
-    ...(useRemoteOxySandbox ? [] : [cardSdkDevPlugin()]),
-  ],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const useRemoteOxySandbox = env.VITE_USE_REMOTE_OXY_SANDBOX === "true";
+  const remoteHost = env.VITE_OXY_SANDBOX_HOST || "https://carduat.oxymoney.com";
 
-  server: {
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
+  if (useRemoteOxySandbox) {
+    console.log(` [Vite Proxy] Routing /ag and /authserver to remote sandbox: ${remoteHost}`);
+  } else {
+    console.log(" [Vite Proxy] Using local dev mock proxy plugin for @oxymoney/cardsdk-web");
+  }
+
+  return {
+    plugins: [
+      tailwindcss(),
+      react(),
+      ...(useRemoteOxySandbox ? [] : [cardSdkDevPlugin()]),
+    ],
+
+    server: {
+      port: 5173,
+      proxy: {
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+        },
+        ...(useRemoteOxySandbox
+          ? {
+              "/ag": {
+                target: remoteHost,
+                changeOrigin: true,
+                secure: false,
+                timeout: 35000,
+              },
+              "/authserver": {
+                target: remoteHost,
+                changeOrigin: true,
+                secure: false,
+                timeout: 35000,
+              },
+            }
+          : {}),
       },
-      ...(useRemoteOxySandbox
-        ? {
-            "/ag": {
-              target: "https://gcdev.oxymoney.com",
-              changeOrigin: true,
-              secure: false,
-              timeout: 35000,
-            },
-            "/authserver": {
-              target: "https://gcdev.oxymoney.com",
-              changeOrigin: true,
-              secure: false,
-              timeout: 35000,
-            },
-          }
-        : {}),
     },
-  },
+  };
 });
 

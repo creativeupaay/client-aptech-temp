@@ -477,6 +477,8 @@ export class CardService {
     }
 
     const studentUser = await User.findById(objectId);
+    const transbank = TransbankFactory.getProvider();
+    const clientToken = await transbank.getClientToken();
 
     return {
       cardId: card.cardId,
@@ -484,7 +486,7 @@ export class CardService {
       maskedPan: card.maskedPan || "•••• •••• •••• 8942",
       holderName: studentUser?.name || "Cardholder",
       clientId: env.TRANSBNK_CLIENT_ID || "EXTCLT000454",
-      clientToken: env.TRANSBNK_CLIENT_PASSWORD || "035950b0-dcaf-4f84-99be-1a23773f5e40",
+      clientToken,
       mobileNumber: studentUser?.mobile || "",
       sdkUrl: "https://cardsdk.oxymoney.com/v3",
       sdkSessionToken: `sdk_sess_${randomUUID()}`,

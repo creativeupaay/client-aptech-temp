@@ -156,4 +156,8 @@ export class MockTransbankProvider implements ITransbankProvider {
       message: "SUCCESS",
     };
   }
+
+  public async getClientToken(): Promise<string> {
+    return `mock_client_token_${Date.now()}`;
+  }
 }

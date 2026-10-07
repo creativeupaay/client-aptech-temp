@@ -182,18 +182,25 @@ export class HttpTransbankProvider implements ITransbankProvider {
   public async getFullKycUrl(input: TransbankFullKycUrlInput): Promise<TransbankFullKycUrlResult> {
     interface ApiKycResult {
       expire_on?: string;
-      kyc_required: boolean;
-      taxation_required: boolean | string;
-      url: string;
+      kyc_required?: boolean | string;
+      taxation_required?: boolean | string;
+      url?: string;
     }
     const res = await this.post<{ senderId: string }, ApiKycResult>("/full-kyc-url", {
       senderId: input.senderId,
     });
+
+    // Gateway returns "false" / "true" as strings or booleans; normalize strictly to boolean
+    const isKycRequired =
+      res?.kyc_required === true || res?.kyc_required === "true";
+    const isTaxationRequired =
+      res?.taxation_required === true || res?.taxation_required === "true";
+
     return {
-      url: res.url,
-      expireOn: res.expire_on,
-      kycRequired: res.kyc_required,
-      taxationRequired: res.taxation_required,
+      url: res?.url || "",
+      expireOn: res?.expire_on,
+      kycRequired: isKycRequired,
+      taxationRequired: isTaxationRequired,
     };
   }
 
@@ -270,5 +277,58 @@ export class HttpTransbankProvider implements ITransbankProvider {
       status: res.status,
       message: res.message,
     };
+  }
+
+  private cachedClientToken: { token: string; expiresAt: number } | null = null;
+
+  /**
+   * Exchanges client credentials for a short-lived OAuth2 Bearer token (clientToken)
+   * used by @oxymoney/cardsdk-web. Caches token in memory based on returned expires_in.
+   */
+  public async getClientToken(): Promise<string> {
+    if (this.cachedClientToken && Date.now() < this.cachedClientToken.expiresAt) {
+      return this.cachedClientToken.token;
+    }
+
+    const tokenUrl = "https://carduat.oxymoney.com/authserver/oauth/token";
+    const credentials = Buffer.from(`${this.clientId}:${this.clientPassword}`).toString("base64");
+    const body = new URLSearchParams({
+      grant_type: "password",
+      username: this.username,
+      password: this.clientPassword,
+    });
+
+    try {
+      const response = await fetch(tokenUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[TransbankProvider] Failed OAuth token response (HTTP ${response.status}):`, errText);
+        // Fallback to clientPassword if authserver fails
+        return this.clientPassword;
+      }
+
+      const data = (await response.json()) as { access_token: string; expires_in?: number };
+      const expiresInSec = typeof data.expires_in === "number" ? data.expires_in : 3600;
+
+      // Cache token, expiring 60s early for safety
+      this.cachedClientToken = {
+        token: data.access_token,
+        expiresAt: Date.now() + Math.max(0, expiresInSec - 60) * 1000,
+      };
+
+      return data.access_token;
+    } catch (err: any) {
+      console.error("[TransbankProvider] getClientToken network error:", err.message);
+      return this.clientPassword;
+    }
   }
 }

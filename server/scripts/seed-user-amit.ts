@@ -9,9 +9,9 @@ async function seed() {
   await mongoose.connect(env.MONGO_URI);
   console.log("Connected to MongoDB successfully.");
 
-  const mobile = "8949006288";
+  const mobile = "8233516296";
   const name = "Amit Sunda";
-  const email = "amit.sunda@example.com";
+  const email = "amit.sunda14@example.com";
   const password = "Password@123";
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -44,28 +44,37 @@ async function seed() {
     console.log(`Updated existing user: ${user.name} (${user.mobile}), ID: ${user._id}`);
   }
 
-  // Ensure user does not have an issued card so that requirement #2 applies
-  const existingCard = await Card.findOne({ userId: user._id });
+  // Ensure user has the real active TransBnk card
+  let existingCard = await Card.findOne({ userId: user._id });
   if (existingCard) {
-    existingCard.status = "NOT_APPLIED";
-    existingCard.cardId = null;
-    existingCard.referenceId = null;
-    existingCard.senderTag = null;
-    existingCard.maskedPan = null;
-    existingCard.availableBalance = 0;
+    existingCard.status = "ACTIVE";
+    existingCard.cardType = "VIRTUAL";
+    existingCard.cardId = "81eff9ac-f1ce-4148-9f27-9f8971fca5e7";
+    existingCard.referenceId = "57e03a3e-b016-46d8-8cdb-91ae70a51b0d";
+    existingCard.senderTag = "dc22def0-1137-4063-be02-2243c72c0b11";
+    existingCard.maskedPan = "•••• •••• •••• 8942";
+    existingCard.availableBalance = existingCard.availableBalance || 0;
     existingCard.totalLimit = 10000;
+    existingCard.isCardEnabled = true;
+    existingCard.isLocked = false;
     await existingCard.save();
-    console.log(`Reset card status to NOT_APPLIED for user: ${user.name}`);
+    console.log(`Linked active TransBnk card for user: ${user.name}`);
   } else {
     await Card.create({
       userId: user._id,
-      status: "NOT_APPLIED",
+      status: "ACTIVE",
       cardType: "VIRTUAL",
       kycStatus: "MIN_KYC",
+      cardId: "81eff9ac-f1ce-4148-9f27-9f8971fca5e7",
+      referenceId: "57e03a3e-b016-46d8-8cdb-91ae70a51b0d",
+      senderTag: "dc22def0-1137-4063-be02-2243c72c0b11",
+      maskedPan: "•••• •••• •••• 8942",
       availableBalance: 0,
       totalLimit: 10000,
+      isCardEnabled: true,
+      isLocked: false,
     });
-    console.log(`Created clean NOT_APPLIED card for user: ${user.name}`);
+    console.log(`Created active card for user: ${user.name}`);
   }
 
   console.log("\n=======================================================");
@@ -75,7 +84,8 @@ async function seed() {
   console.log(`Email:       ${user.email}`);
   console.log(`Password:    ${password}`);
   console.log(`Student ID:  ${user.studentId}`);
-  console.log(`Card Status: NOT_APPLIED (will redirect to /card/issuance)`);
+  console.log(`Card ID:     81eff9ac-f1ce-4148-9f27-9f8971fca5e7`);
+  console.log(`Card Status: ACTIVE`);
   console.log("=======================================================\n");
 
   await mongoose.disconnect();

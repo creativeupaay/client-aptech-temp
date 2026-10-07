@@ -3,6 +3,7 @@ import app from "./app.js";
 import { env } from "./env.config.js";
 import { connectDB, disconnectDB } from "./config/db.config.js";
 
+// Initialized with live TransBnk configuration
 let server: Server | null = null;
 
 const handleShutdown = async (signal: string): Promise<void> => {

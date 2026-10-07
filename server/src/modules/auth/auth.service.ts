@@ -361,6 +361,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         mobile: user.mobile,
+        studentId: user.studentId,
         highestEducation: user.highestEducation,
         isMobileVerified: user.isMobileVerified,
         status: user.status,

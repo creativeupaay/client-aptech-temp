@@ -114,6 +114,9 @@ export interface ITransbankProvider {
     input: TransbankLoadMoneyStatusInput
   ): Promise<TransbankLoadMoneyStatusResult>;
 
+  /** Exchange merchant credentials for short-lived OAuth2 clientToken for CardSDK */
+  getClientToken(): Promise<string>;
+
   /** Optional helper (primarily for mock/dev) to simulate completion of Full KYC on the gateway */
   simulateKycCompletion?(senderId: string): void;
 }
