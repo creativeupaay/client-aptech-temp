@@ -1,7 +1,9 @@
-import express, { type Application, type Request, type Response } from "express";
+import express, { type Application, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
+import { getFilteredSwaggerDocument } from "./docs/swagger.js";
 import { env } from "./env.config.js";
 import v1Router from "./routes/v1/index.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
@@ -12,8 +14,12 @@ const app: Application = express();
 // Enable trust proxy for ngrok, reverse proxies, and load balancers
 app.set("trust proxy", 1);
 
-// Security HTTP headers
-app.use(helmet());
+// Security HTTP headers (allow Swagger UI inline styles and scripts)
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
 
 const allowedOrigins = [
   env.CLIENT_URL,
@@ -68,6 +74,43 @@ app.get("/health", (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
+});
+
+// Interactive Swagger UI documentation
+const activeSwaggerDoc = getFilteredSwaggerDocument(env.DOCS_AUDIENCE);
+
+// Prevent browser from caching Swagger UI init specs across environment changes
+app.use("/api-docs", (_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  next();
+});
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(activeSwaggerDoc, {
+    customSiteTitle:
+      env.DOCS_AUDIENCE === "student_production"
+        ? "AP-Tech Banking & Card Platform API Documentation (Student View)"
+        : "AP-Tech Banking & Card Platform API Documentation (Internal Full)",
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      filter: true,
+    },
+  })
+);
+
+// Alias /docs to /api-docs
+app.get("/docs", (_req: Request, res: Response) => {
+  res.redirect("/api-docs");
+});
+
+// Raw OpenAPI JSON specification (for Postman Import & CI/CD)
+app.get("/api-docs.json", (req: Request, res: Response) => {
+  const audience = (req.query.audience as string) || env.DOCS_AUDIENCE;
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).json(getFilteredSwaggerDocument(audience));
 });
 
 // Mount versioned API routes

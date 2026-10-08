@@ -37,11 +37,33 @@ async function runHubbleVerification() {
   // --------------------------------------------------------------------------
   console.log("▶ [1/5] Testing Classic SSO (/sso)...");
   try {
+    // Dynamically provision / find an active student via SSO simulate & exchange
+    const simRes = await fetch("http://localhost:8000/api/v1/auth/sso/simulate-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Sneha Patel",
+        studentId: "APT-2026-01554",
+        mobile: "9123456789",
+      }),
+    });
+    const simJson = await simRes.json();
+    const authCode = simJson.data.code;
+
+    const exchangeRes = await fetch("http://localhost:8000/api/v1/auth/sso/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: authCode }),
+    });
+    const exchangeJson = await exchangeRes.json();
+    const currentStudentId = exchangeJson.data.user.studentId;
+    const currentUserId = exchangeJson.data.user.id;
+
     const testToken = jwt.sign(
       {
-        id: "6abb6b58e5c4ae4f94d43324",
-        userId: "6abb6b58e5c4ae4f94d43324",
-        studentId: "APT-2026-01554",
+        id: currentUserId,
+        userId: currentUserId,
+        studentId: currentStudentId,
         phoneNumber: "9123456789",
         name: "Sneha Patel",
       },

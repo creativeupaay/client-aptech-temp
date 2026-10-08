@@ -119,6 +119,11 @@ const envSchema = z.object({
   TRANSBNK_PROVIDER: z
     .enum(["mock", "http"])
     .default((process.env.TRANSBNK_PROVIDER as "mock" | "http") || "mock"),
+
+  // Documentation Audience ("student_production" or "internal_full")
+  DOCS_AUDIENCE: z
+    .enum(["student_production", "internal_full"])
+    .default((process.env.DOCS_AUDIENCE as "student_production" | "internal_full") || "student_production"),
 }).superRefine((data, ctx) => {
   if (data.NODE_ENV === "production" && data.TRANSBNK_PROVIDER === "http") {
     if (data.TRANSBNK_API_KEY === "sandbox_api_key") {
