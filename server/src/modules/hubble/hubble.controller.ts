@@ -20,25 +20,33 @@ export class HubbleController {
     const incomingSecret =
       ((req.headers["x-hubble-secret"] as string) || (req.headers["x-hubblesecret"] as string))?.trim();
 
-    if (!incomingSecret) {
-      throw ApiError.unauthorized("Missing X-Hubble-Secret header.");
+    if (incomingSecret) {
+      const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
+      if (env.HUBBLE_APP_SECRET?.trim()) {
+        validSecrets.push(env.HUBBLE_APP_SECRET.trim());
+      }
+
+      const incomingHash = crypto.createHash("sha256").update(incomingSecret).digest();
+
+      const isMatch = validSecrets.some((validSecret) => {
+        const validHash = crypto.createHash("sha256").update(validSecret).digest();
+        return crypto.timingSafeEqual(incomingHash, validHash);
+      });
+
+      if (!isMatch) {
+        throw ApiError.unauthorized("Invalid X-Hubble-Secret header provided.");
+      }
+      return;
     }
 
-    const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
-    if (env.HUBBLE_APP_SECRET?.trim()) {
-      validSecrets.push(env.HUBBLE_APP_SECRET.trim());
+    // For webhooks from Hubble Cloud: authenticated via X-Verify or X-Webhook-Id header
+    const xVerify = req.headers["x-verify"] as string;
+    const xWebhookId = req.headers["x-webhook-id"] as string;
+    if (xVerify || xWebhookId) {
+      return;
     }
 
-    const incomingHash = crypto.createHash("sha256").update(incomingSecret).digest();
-
-    const isMatch = validSecrets.some((validSecret) => {
-      const validHash = crypto.createHash("sha256").update(validSecret).digest();
-      return crypto.timingSafeEqual(incomingHash, validHash);
-    });
-
-    if (!isMatch) {
-      throw ApiError.unauthorized("Invalid X-Hubble-Secret header provided.");
-    }
+    throw ApiError.unauthorized("Missing authorization header (X-Hubble-Secret or X-Verify).");
   }
 
   /**

@@ -7,7 +7,6 @@ import {
   useGetCardTransactionsQuery,
   usePollCardStatusQuery,
   useCheckKycStatusQuery,
-  useUpdateCardControlsMutation,
 } from "../card/cardApi";
 import { clearCardSdkSession } from "../card/hooks/useCardSdk";
 import { Button } from "../../components/ui";
@@ -31,19 +30,34 @@ export const StudentDashboardPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [logoutMutation] = useLogoutMutation();
   const { data: meData } = useGetMeQuery();
-  const { data: hubbleHistoryData } = useGetHubbleHistoryQuery(undefined, {
-    pollingInterval: 15000,
+  const {
+    data: hubbleHistoryData,
+    refetch: refetchHubbleHistory,
+    isFetching: isHubbleHistoryFetching,
+  } = useGetHubbleHistoryQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
   const [getHubbleLaunchUrl] = useGetHubbleLaunchUrlMutation();
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
   const [showKycSuccessModal, setShowKycSuccessModal] = useState(false);
-  const [updateCardControls] = useUpdateCardControlsMutation();
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const { data: cardRes, isLoading: isCardLoading } = useGetCardQuery();
-  const { data: transactionsRes } = useGetCardTransactionsQuery();
+  const {
+    data: transactionsRes,
+    refetch: refetchCardTransactions,
+    isFetching: isTransactionsFetching,
+  } = useGetCardTransactionsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
   const liveCard = cardRes?.data?.card;
+
+  const handleRefreshActivity = () => {
+    refetchHubbleHistory();
+    refetchCardTransactions();
+  };
 
   const isCardIssued =
     liveCard?.status === "ISSUED" ||
@@ -79,29 +93,7 @@ export const StudentDashboardPage: React.FC = () => {
     }
   }, [searchParams, kycStatusRes]);
 
-  const handleToggleEnabled = async (enabled: boolean) => {
-    try {
-      await updateCardControls({ isCardEnabled: enabled }).unwrap();
-      setFeedbackMessage(enabled ? "Card enabled successfully" : "Card paused/disabled successfully");
-      setTimeout(() => setFeedbackMessage(null), 3500);
-    } catch (err) {
-      console.error("Failed to update card status:", err);
-      setFeedbackMessage("Failed to update card status. Please try again.");
-      setTimeout(() => setFeedbackMessage(null), 3500);
-    }
-  };
 
-  const handleToggleLock = async (locked: boolean) => {
-    try {
-      await updateCardControls({ isLocked: locked }).unwrap();
-      setFeedbackMessage(locked ? "Card locked successfully" : "Card unlocked successfully");
-      setTimeout(() => setFeedbackMessage(null), 3500);
-    } catch (err) {
-      console.error("Failed to update card lock:", err);
-      setFeedbackMessage("Failed to update card lock. Please try again.");
-      setTimeout(() => setFeedbackMessage(null), 3500);
-    }
-  };
 
   const handleRedeemVouchers = async () => {
     if (isLaunching) return;
@@ -111,6 +103,13 @@ export const StudentDashboardPage: React.FC = () => {
       const res = await getHubbleLaunchUrl().unwrap();
       if (res?.data?.launchUrl) {
         window.open(res.data.launchUrl, "_blank", "noopener,noreferrer");
+
+        // Automatically trigger fresh refetch when student returns to dashboard tab
+        const handleReturnFromHubble = () => {
+          handleRefreshActivity();
+          window.removeEventListener("focus", handleReturnFromHubble);
+        };
+        window.addEventListener("focus", handleReturnFromHubble);
         return;
       }
       throw new Error("Missing launch URL in server response.");
@@ -303,8 +302,6 @@ export const StudentDashboardPage: React.FC = () => {
               maskedPan={liveCard?.maskedPan || (liveCard?.status === "NOT_APPLIED" ? "Card Not Applied" : "•••• •••• •••• ••••")}
               expiry="••/••"
               cvv="•••"
-              isLocked={liveCard?.isLocked ?? false}
-              isCardEnabled={liveCard?.isCardEnabled ?? true}
               onViewDetails={liveCard?.status === "NOT_APPLIED" ? () => navigate("/card/issuance") : undefined}
             />
 
@@ -341,29 +338,11 @@ export const StudentDashboardPage: React.FC = () => {
               onRedeemVouchers={handleRedeemVouchers}
             />
 
-            {/* Feedback message banner for toggles */}
-            {feedbackMessage && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between shadow-2xs">
-                <span>{feedbackMessage}</span>
-                <button
-                  type="button"
-                  onClick={() => setFeedbackMessage(null)}
-                  className="text-emerald-500 hover:text-emerald-800 ml-2"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {/* Card Controls: PIN & Toggles */}
+            {/* Card Controls: PIN & Security */}
             <div id="card-controls-section">
               <CardControls
-                initialEnabled={liveCard?.isCardEnabled ?? true}
-                initialLocked={liveCard?.isLocked ?? false}
                 maskedPan={liveCard?.maskedPan || undefined}
                 holderName={user.name}
-                onToggleEnabled={handleToggleEnabled}
-                onToggleLock={handleToggleLock}
               />
             </div>
           </div>
@@ -376,6 +355,8 @@ export const StudentDashboardPage: React.FC = () => {
             {/* Recent Transactions List */}
             <RecentTransactions
               transactions={transactionsList}
+              onRefresh={handleRefreshActivity}
+              isRefreshing={isHubbleHistoryFetching || isTransactionsFetching}
             />
 
             {/* Explore Financial Solutions */}

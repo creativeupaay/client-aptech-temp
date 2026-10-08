@@ -34,7 +34,7 @@
     },
     {
       "name": "Card Operations & Funds",
-      "description": "Money loading, transaction ledger, PCI-DSS CardSDK session, and card locking controls"
+      "description": "Money loading, transaction ledger, and PCI-DSS CardSDK session"
     },
     {
       "name": "Hubble Rewards - Student",
@@ -250,21 +250,6 @@
             "type": "string",
             "example": "idem_89a0b12-c3d4-4e5f-6a7b-8c9d0e1f2a3b",
             "description": "Unique idempotency identifier"
-          }
-        }
-      },
-      "UpdateCardControlsRequest": {
-        "type": "object",
-        "properties": {
-          "isCardEnabled": {
-            "type": "boolean",
-            "example": true,
-            "description": "Card operational toggle switch"
-          },
-          "isLocked": {
-            "type": "boolean",
-            "example": false,
-            "description": "Freeze/Lock card toggle"
           }
         }
       },
@@ -832,37 +817,6 @@
         "responses": {
           "200": {
             "description": "Transactions ledger retrieved"
-          }
-        }
-      }
-    },
-    "/card/controls": {
-      "patch": {
-        "tags": [
-          "Card Operations & Funds"
-        ],
-        "summary": "Update card freeze & enabled switches",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateCardControlsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Card controls updated successfully"
           }
         }
       }

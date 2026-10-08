@@ -10,7 +10,6 @@ import { sanitizeMobileNumber } from "./auth.validation.js";
 export interface TokenPayload {
   id: string;
   mobile: string;
-  role: string;
   userType: string;
 }
 
@@ -23,11 +22,10 @@ export class AuthService {
   /**
    * Generates paired Access (short-lived) and Refresh (long-lived) tokens.
    */
-  public static generateTokens(user: IUserDocument | { _id: string; mobile: string; role: string; userType: string }): AuthTokens {
+  public static generateTokens(user: IUserDocument | { _id: unknown; mobile: string; userType: string }): AuthTokens {
     const payload: TokenPayload = {
-      id: user._id.toString(),
+      id: user._id ? user._id.toString() : "",
       mobile: user.mobile,
-      role: user.role,
       userType: user.userType,
     };
 
@@ -98,7 +96,7 @@ export class AuthService {
     }
 
     const user = await User.findById(decoded.id);
-    if (!user || user.status === "suspended") {
+    if (!user) {
       throw ApiError.unauthorized("User session is no longer active. Please log in again via Aptech ProConnect.");
     }
 
@@ -112,11 +110,8 @@ export class AuthService {
         name: user.name,
         email: user.email,
         mobile: user.mobile,
-        highestEducation: user.highestEducation,
-        isMobileVerified: user.isMobileVerified,
-        status: user.status,
+        studentId: user.studentId,
         userType: user.userType,
-        role: user.role,
       },
     };
   }
@@ -139,11 +134,7 @@ export class AuthService {
         email: user.email,
         mobile: user.mobile,
         studentId: user.studentId,
-        highestEducation: user.highestEducation,
-        isMobileVerified: user.isMobileVerified,
-        status: user.status,
         userType: user.userType,
-        role: user.role,
       },
       card: {
         status: card?.status ?? "NOT_APPLIED",
@@ -182,8 +173,6 @@ export class AuthService {
       user.studentId = studentProfile.studentId;
       user.mobile = sanitizedMobile;
       user.userType = "aptech_student";
-      user.isMobileVerified = true;
-      user.status = "active";
       if (!user.name && studentProfile.name) {
         user.name = studentProfile.name;
       }
@@ -198,12 +187,7 @@ export class AuthService {
         email: studentProfile.email.toLowerCase().trim(),
         mobile: sanitizedMobile,
         studentId: studentProfile.studentId,
-        highestEducation: "Undergraduate / Bachelor's",
-        isMobileVerified: true,
-        isEmailVerified: true,
-        status: "active",
         userType: "aptech_student",
-        role: "student",
       });
     }
 
@@ -216,7 +200,6 @@ export class AuthService {
           status: "NOT_APPLIED",
           cardType: "VIRTUAL",
           kycStatus: "MIN_KYC",
-          isLocked: false,
         },
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
@@ -240,11 +223,7 @@ export class AuthService {
         email: user.email,
         mobile: user.mobile,
         studentId: user.studentId,
-        highestEducation: user.highestEducation,
-        isMobileVerified: user.isMobileVerified,
-        status: user.status,
         userType: user.userType,
-        role: user.role,
       },
       card: {
         status: card.status,

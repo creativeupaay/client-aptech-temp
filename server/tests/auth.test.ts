@@ -46,7 +46,6 @@ describe("Aptech ProConnect SSO & Session Management", () => {
       expect(exchangeRes.body.data.user.name).toBe("Rohan Verma");
       expect(exchangeRes.body.data.user.mobile).toBe("9123456780");
       expect(exchangeRes.body.data.user.userType).toBe("aptech_student");
-      expect(exchangeRes.body.data.user.isMobileVerified).toBe(true);
       expect(exchangeRes.body.data.isCardIssued).toBe(false);
       expect(exchangeRes.body.data.card.status).toBe("NOT_APPLIED");
       expect(exchangeRes.body.data.token).toBeDefined();
@@ -73,11 +72,7 @@ describe("Aptech ProConnect SSO & Session Management", () => {
         name: "Pooja Hegde",
         email: "pooja.hegde@example.com",
         mobile: "9888877777",
-        highestEducation: "Undergraduate / Bachelor's",
-        isMobileVerified: true,
         userType: "non_aptech_student",
-        status: "active",
-        role: "student",
       });
 
       expect(existingUser.userType).toBe("non_aptech_student");

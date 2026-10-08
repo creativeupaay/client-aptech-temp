@@ -19,13 +19,8 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
       name: "Aarav Sharma",
       email: "aarav.sharma@example.com",
       mobile: "9987657875",
-      highestEducation: "Undergraduate / Bachelor's",
-      passwordHash: "secure_password_hash_12345",
       userType: "aptech_student",
       studentId: "APT-2026-00417",
-      isMobileVerified: true,
-      role: "student",
-      status: "active",
     });
 
     testUserId = user._id.toString();
@@ -34,7 +29,6 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
       {
         id: testUserId,
         mobile: user.mobile,
-        role: user.role,
         userType: user.userType,
       },
       env.JWT_ACCESS_SECRET,
@@ -457,8 +451,6 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
         kycStatus: "MIN_KYC",
         availableBalance: 0,
         totalLimit: 10000,
-        isLocked: false,
-        isCardEnabled: true,
       });
 
       const res = await request(app)
@@ -505,8 +497,6 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
         kycStatus: "FULL_KYC",
         availableBalance: 0,
         totalLimit: 200000,
-        isLocked: false,
-        isCardEnabled: true,
       });
 
       const res = await request(app)

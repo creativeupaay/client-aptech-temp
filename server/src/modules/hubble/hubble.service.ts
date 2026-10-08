@@ -464,21 +464,37 @@ export class HubbleService {
       studentId: data.studentId ?? undefined,
     });
 
-    let normalizedStatus: VoucherStatus = (data.status as VoucherStatus) || "ACTIVE";
-    if (normalizedStatus === "SUCCESS" || normalizedStatus === "COMPLETED") {
+    const firstVoucher = data.vouchers?.[0];
+    const orderId =
+      data.orderId ||
+      data.transactionReferenceId ||
+      firstVoucher?.id ||
+      `HBL_ORD_${Date.now()}`;
+
+    const transactionId =
+      data.transactionId ||
+      data.partnerCoinTransactionId ||
+      undefined;
+
+    const rawStatus = (data.status || data.orderStatus || "ACTIVE").toUpperCase();
+    let normalizedStatus: VoucherStatus = "ACTIVE";
+    if (rawStatus === "FAILED" || rawStatus === "CANCELLED") {
+      normalizedStatus = "FAILED";
+    } else if (rawStatus === "USED") {
+      normalizedStatus = "USED";
+    } else if (rawStatus === "EXPIRED") {
+      normalizedStatus = "EXPIRED";
+    } else {
       normalizedStatus = "ACTIVE";
     }
 
     // Auto-reversal handling: if voucher redemption failed/cancelled on Hubble, restore student's coins
-    if (
-      normalizedStatus === "FAILED" ||
-      normalizedStatus === "CANCELLED"
-    ) {
+    if (normalizedStatus === "FAILED") {
       const debitTx = await DebitTransaction.findOne({
         $or: [
-          { orderId: data.orderId },
-          { referenceId: data.orderId },
-          ...(data.transactionId ? [{ transactionId: data.transactionId }] : []),
+          { orderId },
+          { referenceId: orderId },
+          ...(transactionId ? [{ transactionId }] : []),
         ],
         status: "DEBITED",
       });
@@ -489,37 +505,81 @@ export class HubbleService {
             studentId: user.studentId,
             userId: user._id.toString(),
             transactionId: debitTx.transactionId,
-            referenceId: data.orderId,
-            reason: `Voucher order ${data.orderId} failed/cancelled on Hubble (Auto-Reversal)`,
+            referenceId: orderId,
+            reason: `Voucher order ${orderId} failed/cancelled on Hubble (Auto-Reversal)`,
           });
           normalizedStatus = "REFUNDED";
         } catch (revErr) {
           console.error(
-            `[HUBBLE WEBHOOK] Auto-reversal failed for order ${data.orderId}:`,
+            `[HUBBLE WEBHOOK] Auto-reversal failed for order ${orderId}:`,
             revErr
           );
         }
       }
     }
 
-    const encryptedVoucherCode = data.voucherCode ? encryptSensitive(data.voucherCode) : undefined;
-    const encryptedPin = data.pin ? encryptSensitive(data.pin) : undefined;
+    const rawVoucherCode =
+      data.voucherCode ||
+      firstVoucher?.cardNumber ||
+      firstVoucher?.voucherCode;
+
+    const rawPin =
+      data.pin ||
+      firstVoucher?.cardPin ||
+      firstVoucher?.pin;
+
+    const brandName =
+      data.brandName ||
+      firstVoucher?.brandName ||
+      "Brand Gift Card";
+
+    const denomination = Number(
+      data.denomination ?? data.amount ?? firstVoucher?.amount ?? 100
+    );
+
+    const pointsDebited = Number(
+      data.pointsDebited ??
+        data.partnerCoinsDebited ??
+        data.coinAmount ??
+        denomination
+    );
+
+    const expiryDate =
+      data.expiryDate ||
+      firstVoucher?.validTill ||
+      firstVoucher?.expiryDate ||
+      undefined;
+
+    const redemptionUrl =
+      data.redemptionUrl ||
+      firstVoucher?.shareImageUrl ||
+      firstVoucher?.redemptionUrl ||
+      undefined;
+
+    const encryptedVoucherCode = rawVoucherCode ? encryptSensitive(rawVoucherCode) : undefined;
+    const encryptedPin = rawPin ? encryptSensitive(rawPin) : undefined;
 
     const voucher = await VoucherRedemption.findOneAndUpdate(
-      { orderId: data.orderId },
+      {
+        $or: [
+          { orderId },
+          ...(transactionId ? [{ transactionId }] : []),
+        ],
+      },
       {
         $set: {
           userId: user._id,
           studentId: user.studentId,
-          brandName: data.brandName ?? "Brand Gift Card",
+          orderId,
+          brandName,
           voucherCode: encryptedVoucherCode,
           pin: encryptedPin,
-          denomination: data.denomination ?? 100,
-          pointsDebited: data.pointsDebited ?? 100,
-          expiryDate: data.expiryDate ?? undefined,
-          redemptionUrl: data.redemptionUrl ?? undefined,
+          denomination,
+          pointsDebited,
+          expiryDate,
+          redemptionUrl,
           status: normalizedStatus,
-          transactionId: data.transactionId ?? undefined,
+          transactionId,
         },
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }

@@ -12,8 +12,6 @@ export interface CardData {
   availableBalance: number;
   usedAmount: number;
   totalLimit: number;
-  isLocked: boolean;
-  isCardEnabled: boolean;
 }
 
 export interface CardTransactionItem {
@@ -204,18 +202,6 @@ export const cardApi = baseApi.injectEndpoints({
       query: () => "/card/transactions",
       providesTags: ["CardTransactions"],
     }),
-
-    updateCardControls: builder.mutation<
-      { success: boolean; data: { card: CardData } },
-      { isCardEnabled?: boolean; isLocked?: boolean }
-    >({
-      query: (body) => ({
-        url: "/card/controls",
-        method: "PATCH",
-        body,
-      }),
-      invalidatesTags: ["Card"],
-    }),
   }),
 });
 
@@ -233,6 +219,5 @@ export const {
   useMockCompleteFullKycMutation,
   useLoadMoneyMutation,
   useGetCardTransactionsQuery,
-  useUpdateCardControlsMutation,
 } = cardApi;
 

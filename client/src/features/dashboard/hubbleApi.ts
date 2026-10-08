@@ -53,6 +53,7 @@ export const hubbleApi = baseApi.injectEndpoints({
     }),
     getHubbleHistory: builder.query<HubbleHistoryResponse, void>({
       query: () => "/hubble/history",
+      providesTags: ["HubbleHistory"],
     }),
   }),
 });

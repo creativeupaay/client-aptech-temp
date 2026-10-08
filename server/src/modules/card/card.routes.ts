@@ -8,7 +8,6 @@ import {
   loadMoneySchema,
   registerAndIssueCardSchema,
   sendCardOtpSchema,
-  updateCardControlsSchema,
 } from "./card.validation.js";
 
 const router = Router();
@@ -75,13 +74,5 @@ router.post(
 
 // Recent Card Transactions
 router.get("/transactions", authenticate, CardController.getTransactions);
-
-// Card Controls (Lock / Enable)
-router.patch(
-  "/controls",
-  authenticate,
-  validateRequest({ body: updateCardControlsSchema }),
-  CardController.updateCardControls
-);
 
 export const cardRoutes = router;

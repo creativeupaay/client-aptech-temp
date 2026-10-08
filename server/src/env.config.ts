@@ -40,16 +40,7 @@ const envSchema = z.object({
     .min(16, "ENCRYPTION_KEY must be at least 16 characters")
     .default(process.env.ENCRYPTION_KEY || "tbx_data_encryption_vault_key_2026"),
 
-  OTP_EXPIRY_MINUTES: z
-    .string()
-    .default("10")
-    .transform((val) => parseInt(val, 10))
-    .refine((val) => !isNaN(val) && val > 0, {
-      message: "OTP_EXPIRY_MINUTES must be a positive number",
-    }),
-  SMS_PROVIDER: z
-    .enum(["mock", "twilio", "gupshup"])
-    .default("mock"),
+
   PROCONNECT_API_URL: z
     .string()
     .default("http://localhost:8000/api/v1/mock/proconnect"),

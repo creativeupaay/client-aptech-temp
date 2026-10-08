@@ -45,33 +45,49 @@ export const reverseDebitSchema = z
   })
   .passthrough();
 
+export const webhookVoucherItemSchema = z
+  .object({
+    id: z.string().nullable().optional(),
+    cardType: z.string().nullable().optional(),
+    cardPin: z.string().nullable().optional(),
+    cardNumber: z.string().nullable().optional(),
+    voucherCode: z.string().nullable().optional(),
+    pin: z.string().nullable().optional(),
+    validTill: z.string().nullable().optional(),
+    expiryDate: z.string().nullable().optional(),
+    shareImageUrl: z.string().nullable().optional(),
+    redemptionUrl: z.string().nullable().optional(),
+    amount: z.coerce.number().nullable().optional(),
+    brandId: z.string().nullable().optional(),
+    brandName: z.string().nullable().optional(),
+    brandRetailModes: z.array(z.string()).nullable().optional(),
+  })
+  .passthrough();
+
 export const webhookTransactionSchema = z
   .object({
-    orderId: z.string(),
+    orderId: z.string().nullable().optional(),
+    transactionReferenceId: z.string().nullable().optional(),
+    partnerCoinTransactionId: z.string().nullable().optional(),
+    partnerCoinReversalTransactionId: z.string().nullable().optional(),
+    partnerCoinsDebited: z.coerce.number().nullable().optional(),
+    orderStatus: z.string().nullable().optional(),
     userId: z.string().nullable().optional(),
     studentId: z.string().nullable().optional(),
     brandName: z.string().nullable().optional().default("Brand Gift Card"),
     voucherCode: z.string().nullable().optional(),
     pin: z.string().nullable().optional(),
-    denomination: z.coerce.number().positive().nullable().optional().default(100),
-    pointsDebited: z.coerce.number().positive().nullable().optional().default(100),
+    denomination: z.coerce.number().positive().nullable().optional(),
+    amount: z.coerce.number().positive().nullable().optional(),
+    discountAmount: z.coerce.number().nullable().optional(),
+    coinAmount: z.coerce.number().nullable().optional(),
+    pointsDebited: z.coerce.number().positive().nullable().optional(),
     expiryDate: z.string().nullable().optional(),
     redemptionUrl: z.string().nullable().optional(),
-    status: z
-      .enum([
-        "ACTIVE",
-        "SUCCESS",
-        "COMPLETED",
-        "PENDING",
-        "FAILED",
-        "USED",
-        "EXPIRED",
-        "CANCELLED",
-      ])
-      .nullable()
-      .optional()
-      .default("ACTIVE"),
+    status: z.string().nullable().optional(),
     transactionId: z.string().nullable().optional(),
+    timestamp: z.string().nullable().optional(),
+    vouchers: z.array(webhookVoucherItemSchema).nullable().optional(),
   })
   .passthrough();
 

@@ -6,11 +6,7 @@ export interface AuthUserData {
   email: string;
   mobile: string;
   studentId?: string;
-  highestEducation?: string;
-  isMobileVerified: boolean;
-  status: string;
   userType: string;
-  role: string;
 }
 
 export interface AuthCardData {

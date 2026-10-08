@@ -22,8 +22,6 @@ export interface DashboardData {
     usedAmount: number;
     totalLimit: number;
     availableBalance: number;
-    isCardEnabled: boolean;
-    isCardLocked: boolean;
   };
   rewards: {
     cashback: number;
@@ -47,8 +45,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     usedAmount: 3000,
     totalLimit: 10000,
     availableBalance: 7000,
-    isCardEnabled: true,
-    isCardLocked: false,
   },
   rewards: {
     cashback: 42,

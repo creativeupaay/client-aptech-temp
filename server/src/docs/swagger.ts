@@ -43,7 +43,7 @@ export const swaggerDocument = {
     },
     {
       name: "Card Operations & Funds",
-      description: "Money loading, transaction ledger, PCI-DSS CardSDK session, and card locking controls",
+      description: "Money loading, transaction ledger, and PCI-DSS CardSDK session",
     },
     {
       name: "Hubble Rewards - Student",
@@ -185,13 +185,7 @@ export const swaggerDocument = {
           },
         },
       },
-      UpdateCardControlsRequest: {
-        type: "object",
-        properties: {
-          isCardEnabled: { type: "boolean", example: true, description: "Card operational toggle switch" },
-          isLocked: { type: "boolean", example: false, description: "Freeze/Lock card toggle" },
-        },
-      },
+
       HubbleDebitRequest: {
         type: "object",
         properties: {
@@ -478,24 +472,7 @@ export const swaggerDocument = {
         },
       },
     },
-    "/card/controls": {
-      patch: {
-        tags: ["Card Operations & Funds"],
-        summary: "Update card freeze & enabled switches",
-        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/UpdateCardControlsRequest" },
-            },
-          },
-        },
-        responses: {
-          200: { description: "Card controls updated successfully" },
-        },
-      },
-    },
+
     "/hubble/launch-url": {
       post: {
         tags: ["Hubble Rewards - Student"],

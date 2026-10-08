@@ -8,7 +8,6 @@ import type {
   LoadMoneyInput,
   RegisterAndIssueCardInput,
   SendCardOtpInput,
-  UpdateCardControlsInput,
 } from "./card.validation.js";
 
 export class CardController {
@@ -253,27 +252,6 @@ export class CardController {
         statusCode: 200,
         message: "Transactions retrieved successfully",
         data: { transactions },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  public static async updateCardControls(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const userId = CardController.getUserId(req);
-      const card = await CardService.updateCardControls(
-        userId,
-        req.body as UpdateCardControlsInput
-      );
-      sendResponse(res, {
-        statusCode: 200,
-        message: "Card controls updated successfully",
-        data: { card },
       });
     } catch (error) {
       next(error);

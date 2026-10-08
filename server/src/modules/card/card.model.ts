@@ -22,13 +22,10 @@ export interface ICard {
   cardId?: string | null;
   referenceId?: string | null;
   maskedPan?: string | null;
-  issuerKitNo?: string | null;
   issuedAt?: Date | null;
   availableBalance: number;
   usedAmount: number;
   totalLimit: number;
-  isLocked: boolean;
-  isCardEnabled: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -87,11 +84,6 @@ const cardSchema = new Schema<ICardDocument>(
       default: null,
       trim: true,
     },
-    issuerKitNo: {
-      type: String,
-      default: null,
-      trim: true,
-    },
     issuedAt: {
       type: Date,
       default: null,
@@ -110,14 +102,6 @@ const cardSchema = new Schema<ICardDocument>(
       type: Number,
       default: 10000,
       min: 0,
-    },
-    isLocked: {
-      type: Boolean,
-      default: false,
-    },
-    isCardEnabled: {
-      type: Boolean,
-      default: true,
     },
   },
   {

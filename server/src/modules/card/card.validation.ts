@@ -265,13 +265,8 @@ export const loadMoneySchema = z.object({
     .optional(),
 });
 
-export const updateCardControlsSchema = z.object({
-  isCardEnabled: z.boolean().optional(),
-  isLocked: z.boolean().optional(),
-});
-
 export type SendCardOtpInput = z.infer<typeof sendCardOtpSchema>;
 export type RegisterAndIssueCardInput = z.infer<typeof registerAndIssueCardSchema>;
 export type CompleteFullKycInput = z.infer<typeof completeFullKycSchema>;
 export type LoadMoneyInput = z.infer<typeof loadMoneySchema>;
-export type UpdateCardControlsInput = z.infer<typeof updateCardControlsSchema>;
+

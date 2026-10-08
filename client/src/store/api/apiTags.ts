@@ -7,6 +7,7 @@ export const API_TAGS = [
   "User",
   "Card",
   "CardTransactions",
+  "HubbleHistory",
 ] as const;
 
 export type ApiTag = (typeof API_TAGS)[number];

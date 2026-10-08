@@ -111,11 +111,7 @@ describe("Redis End-to-End Capabilities (Distributed Locks, Caching & Rate Limit
         email: "lock@example.com",
         mobile: "9111122221",
         studentId,
-        highestEducation: "Undergraduate / Bachelor's",
-        passwordHash: "hash",
-        isMobileVerified: true,
         userType: "aptech_student",
-        role: "student",
       });
 
       // Hook mock provider to add a slight delay simulating network transit
@@ -284,11 +280,7 @@ describe("Redis End-to-End Capabilities (Distributed Locks, Caching & Rate Limit
         name: "Poll Student",
         email: "poll@example.com",
         mobile: "9444433331",
-        highestEducation: "Undergraduate / Bachelor's",
-        passwordHash: "hash",
-        isMobileVerified: true,
         userType: "aptech_student",
-        role: "student",
       });
 
       const card = await Card.create({

@@ -25,13 +25,7 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       email: "aarav.sharma@aptech.ac.in",
       mobile: "9876543210",
       studentId: "APT-2026-00417",
-      highestEducation: "Undergraduate / Bachelor's",
-      passwordHash: "hashed_dummy_password",
-      isMobileVerified: true,
-      isEmailVerified: true,
-      status: "active",
       userType: "aptech_student",
-      role: "student",
     });
 
     // Create a valid JWT access token for student authenticated routes
@@ -39,7 +33,6 @@ describe("Hubble Money Integration (Stateless Proxy to Aptech Coin API)", () => 
       {
         id: testUser._id.toString(),
         mobile: testUser.mobile,
-        role: testUser.role,
         userType: testUser.userType,
       },
       env.JWT_ACCESS_SECRET,

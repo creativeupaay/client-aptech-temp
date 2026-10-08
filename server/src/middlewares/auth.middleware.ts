@@ -6,8 +6,8 @@ import { ApiError } from "../utils/ApiError.js";
 export interface AuthUserPayload {
   id: string;
   mobile: string;
-  role: string;
   userType: string;
+  role?: string;
 }
 
 export interface AuthenticatedRequest extends Request {

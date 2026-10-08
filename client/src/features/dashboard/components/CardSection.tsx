@@ -6,7 +6,7 @@ import {
 } from "../../../assets/dashboard";
 import { Button } from "../../../components/ui";
 import { useCardSdk } from "../../card";
-import { Loader2, Lock, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface CardSectionProps {
   holderName?: string;
@@ -14,8 +14,6 @@ interface CardSectionProps {
   maskedPan?: string;
   expiry?: string;
   cvv?: string;
-  isLocked?: boolean;
-  isCardEnabled?: boolean;
   onViewDetails?: () => void;
 }
 
@@ -97,8 +95,6 @@ export const CardSection: React.FC<CardSectionProps> = ({
   cardNumber,
   maskedPan = "•••• •••• •••• ••••",
   expiry = "••/••",
-  isLocked = false,
-  isCardEnabled = true,
   onViewDetails,
 }) => {
   const { launchSdk } = useCardSdk();
@@ -152,19 +148,9 @@ export const CardSection: React.FC<CardSectionProps> = ({
             className="h-8 sm:h-9 object-contain drop-shadow-xs"
           />
           <div className="flex items-center gap-1.5">
-            {isLocked ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-red-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
-                <Lock className="w-3 h-3" /> Card Locked
-              </span>
-            ) : !isCardEnabled ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
-                ⏸ Card Paused
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
-                ● Active
-              </span>
-            )}
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-600/90 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+              ● Active
+            </span>
           </div>
         </div>
 

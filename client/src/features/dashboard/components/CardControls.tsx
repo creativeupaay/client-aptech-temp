@@ -1,70 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "../../../components/ui";
 import { useCardSdk } from "../../card";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ShieldCheck, SlidersHorizontal } from "lucide-react";
 
 interface CardControlsProps {
-  initialEnabled?: boolean;
-  initialLocked?: boolean;
   maskedPan?: string;
   holderName?: string;
-  onGeneratePin?: () => void;
-  onToggleEnabled?: (enabled: boolean) => void | Promise<void>;
-  onToggleLock?: (locked: boolean) => void | Promise<void>;
 }
 
-export const CardControls: React.FC<CardControlsProps> = ({
-  initialEnabled = true,
-  initialLocked = false,
-  onGeneratePin,
-  onToggleEnabled,
-  onToggleLock,
-}) => {
-  const [isEnabled, setIsEnabled] = useState(initialEnabled);
-  const [isLocked, setIsLocked] = useState(initialLocked);
-  const [isLaunchingPin, setIsLaunchingPin] = useState(false);
-  const [pinError, setPinError] = useState<string | null>(null);
+export const CardControls: React.FC<CardControlsProps> = () => {
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { launchSdk } = useCardSdk();
 
-  useEffect(() => {
-    setIsEnabled(initialEnabled);
-  }, [initialEnabled]);
-
-  useEffect(() => {
-    setIsLocked(initialLocked);
-  }, [initialLocked]);
-
-  const handleGeneratePinClick = async () => {
-    setPinError(null);
-    setIsLaunchingPin(true);
+  const handleOpenControls = async () => {
+    setErrorMsg(null);
+    setIsLaunching(true);
     try {
       await launchSdk();
-      onGeneratePin?.();
     } catch (err: unknown) {
-      setPinError(err instanceof Error ? err.message : "Failed to open official Card SDK.");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to open Oxymoney Card SDK.");
     } finally {
-      setIsLaunchingPin(false);
-    }
-  };
-
-  const handleToggleEnabled = async () => {
-    const next = !isEnabled;
-    setIsEnabled(next);
-    try {
-      await onToggleEnabled?.(next);
-    } catch {
-      setIsEnabled(!next);
-    }
-  };
-
-  const handleToggleLock = async () => {
-    const next = !isLocked;
-    setIsLocked(next);
-    try {
-      await onToggleLock?.(next);
-    } catch {
-      setIsLocked(!next);
+      setIsLaunching(false);
     }
   };
 
@@ -73,105 +31,81 @@ export const CardControls: React.FC<CardControlsProps> = ({
       {/* Title & Description */}
       <div>
         <h3 className="text-base sm:text-lg font-bold text-[#1C1C21]">
-          Card Controls
+          Card Controls & Security
         </h3>
         <p className="text-xs sm:text-sm text-[#737380] mt-1">
-          Manage your card PIN, usage, and lock status securely via RuPay Core.
+          Manage your PIN, card lock, transaction limits, and channels securely via Oxymoney.
         </p>
       </div>
 
-      {/* Controls 3-Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 mt-5">
-        {/* 1. Generate PIN */}
-        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
+      {/* Controls Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4 mt-5">
+        {/* 1. Generate / Reset PIN */}
+        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3.5 flex flex-col justify-between h-[110px]">
           <div>
-            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Generate PIN</h4>
-            <p className="text-xs text-[#737380] mt-0.5 leading-tight">
-              PCI-DSS Secure PIN
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#DB6516]" />
+              <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">PIN Management</h4>
+            </div>
+            <p className="text-xs text-[#737380] mt-1 leading-tight">
+              PCI-DSS Secure PIN setup & reset
             </p>
           </div>
           <div>
             <Button
-              onClick={handleGeneratePinClick}
-              disabled={isLaunchingPin}
+              onClick={handleOpenControls}
+              disabled={isLaunching}
               className="h-[30px] px-3.5 text-xs font-semibold rounded-[6px] shadow-none bg-[#DB6516] hover:bg-[#c45710] text-white flex items-center gap-1.5 cursor-pointer"
             >
-              {isLaunchingPin ? (
+              {isLaunching ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
                   <span>Loading...</span>
                 </>
               ) : (
-                "Set PIN"
+                "Set / Reset PIN"
               )}
             </Button>
           </div>
         </div>
 
-        {/* 2. Enable / Disable */}
-        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
+        {/* 2. Card Controls & Lock */}
+        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3.5 flex flex-col justify-between h-[110px]">
           <div>
-            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Enable / Disable</h4>
-            <p className="text-xs font-medium text-[#737380] mt-0.5 leading-tight">
-              {isEnabled ? "Card Active" : "Card Disabled"}
+            <div className="flex items-center gap-1.5">
+              <SlidersHorizontal className="w-4 h-4 text-[#DB6516]" />
+              <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Card Controls</h4>
+            </div>
+            <p className="text-xs text-[#737380] mt-1 leading-tight">
+              Lock card, channels & limit rules
             </p>
           </div>
-          <div className="flex items-center">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isEnabled}
-              onClick={handleToggleEnabled}
-              className={`w-[44px] h-[25px] flex items-center rounded-full p-[2.5px] cursor-pointer transition-colors duration-200 ease-in-out ${
-                isEnabled ? "bg-[#48CD5E]" : "bg-[#DEDEE1]"
-              }`}
-            >
-              <div
-                className={`bg-white w-5 h-5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.15)] transform transition-transform duration-200 ease-in-out ${
-                  isEnabled ? "translate-x-[19px]" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* 3. Lock Card */}
-        <div className="rounded-[14px] border border-[#E8E8EB] bg-[#FAFAFB] p-3 sm:p-3.5 flex flex-col justify-between h-[100px] max-h-[100px]">
           <div>
-            <h4 className="text-sm font-bold text-[#1C1C21] leading-tight">Lock Card</h4>
-            <p className="text-xs font-medium text-[#737380] mt-0.5 leading-tight">
-              {isLocked ? "Card Locked" : "Card Unlocked"}
-            </p>
-          </div>
-          <div className="flex items-center">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isLocked}
-              onClick={handleToggleLock}
-              className={`w-[44px] h-[25px] flex items-center rounded-full p-[2.5px] cursor-pointer transition-colors duration-200 ease-in-out ${
-                isLocked ? "bg-[#DB6516]" : "bg-[#DEDEE1]"
-              }`}
+            <Button
+              onClick={handleOpenControls}
+              disabled={isLaunching}
+              variant="outline"
+              className="h-[30px] px-3.5 text-xs font-semibold rounded-[6px] border-[#DB6516] text-[#DB6516] hover:bg-[#FFF5EE] flex items-center gap-1.5 cursor-pointer"
             >
-              <div
-                className={`bg-white w-5 h-5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.15)] transform transition-transform duration-200 ease-in-out ${
-                  isLocked ? "translate-x-[19px]" : "translate-x-0"
-                }`}
-              />
-            </button>
+              {isLaunching ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                "Manage Controls"
+              )}
+            </Button>
           </div>
         </div>
       </div>
 
-      {pinError && (
+      {errorMsg && (
         <div className="mt-3 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-          <span>{pinError}</span>
+          <span>{errorMsg}</span>
         </div>
       )}
     </div>
   );
 };
-
-
-

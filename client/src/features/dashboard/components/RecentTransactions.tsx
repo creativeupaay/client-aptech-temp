@@ -1,23 +1,44 @@
 import React from "react";
-import { Star } from "lucide-react";
+import { Star, RefreshCw } from "lucide-react";
 import type { Transaction } from "../mockData";
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
   onViewAll?: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const RecentTransactions: React.FC<RecentTransactionsProps> = ({
   transactions,
   onViewAll,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
-          RECENT TRANSACTIONS
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+            RECENT TRANSACTIONS
+          </h3>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              title="Refresh activity"
+              aria-label="Refresh activity"
+              className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw
+                size={12}
+                className={isRefreshing ? "animate-spin text-[#D85A14]" : ""}
+              />
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={onViewAll}

@@ -14,7 +14,10 @@
     "test:redis": "tsx --env-file=.env scripts/test-redis-manual.ts",
     "test:hubble": "tsx --env-file=.env scripts/test-hubble-endpoints.ts",
     "mock:proconnect": "node ../mock-proconnect/server.mjs",
-    "docs:export": "tsx scripts/export-docs.ts"
+    "docs:export": "tsx scripts/export-docs.ts",
+    "seed:users": "tsx scripts/seed-users.ts",
+    "seed:amit": "tsx scripts/seed-user-amit.ts",
+    "seed:manish": "tsx scripts/seed-user-manish.ts"
   },
   "keywords": [],
   "author": "",

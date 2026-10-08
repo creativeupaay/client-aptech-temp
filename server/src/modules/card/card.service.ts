@@ -14,7 +14,6 @@ import type {
   CompleteFullKycInput,
   LoadMoneyInput,
   RegisterAndIssueCardInput,
-  UpdateCardControlsInput,
 } from "./card.validation.js";
 
 export class CardService {
@@ -35,8 +34,6 @@ export class CardService {
         availableBalance: 0,
         usedAmount: 0,
         totalLimit: 10000,
-        isLocked: false,
-        isCardEnabled: true,
       });
     }
 
@@ -532,9 +529,7 @@ export class CardService {
       );
     }
 
-    if (card.isLocked) {
-      throw ApiError.badRequest("Card is locked. Please unlock the card in controls before loading funds.");
-    }
+
 
     if (card.availableBalance + input.amount > card.totalLimit) {
       throw ApiError.badRequest(
@@ -642,7 +637,6 @@ export class CardService {
     const updatedCard = await Card.findOneAndUpdate(
       {
         _id: card._id,
-        isLocked: false,
         $expr: {
           $lte: [{ $add: ["$availableBalance", input.amount] }, "$totalLimit"],
         },
@@ -655,7 +649,7 @@ export class CardService {
 
     if (!updatedCard) {
       throw ApiError.badRequest(
-        "Unable to credit funds: card is locked or total balance exceeds card limit."
+        "Unable to credit funds: total balance exceeds card limit."
       );
     }
 
@@ -677,26 +671,5 @@ export class CardService {
   ): Promise<ICardTransactionDocument[]> {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     return await CardTransaction.find({ userId: objectId }).sort({ createdAt: -1 }).limit(20);
-  }
-
-  /**
-   * Toggles card locking or status controls.
-   */
-  public static async updateCardControls(
-    userId: Types.ObjectId | string,
-    input: UpdateCardControlsInput
-  ): Promise<ICardDocument> {
-    const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
-    const card = await this.getCard(objectId);
-
-    if (input.isCardEnabled !== undefined) {
-      card.isCardEnabled = input.isCardEnabled;
-    }
-    if (input.isLocked !== undefined) {
-      card.isLocked = input.isLocked;
-    }
-
-    await card.save();
-    return card;
   }
 }

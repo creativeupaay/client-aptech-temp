@@ -15,10 +15,14 @@ const activeSwaggerDoc = getFilteredSwaggerDocument(audience);
 
 console.log(`[DOCS] Generating API documentation with audience: ${audience}`);
 
-// 1. Write swagger.json (in server src/docs)
-const swaggerJsonPath = path.join(serverRootDir, "src", "docs", "swagger.json");
+// 1. Write swagger.json (in server root and server src/docs)
+const swaggerJsonPath = path.join(serverRootDir, "swagger.json");
 fs.writeFileSync(swaggerJsonPath, JSON.stringify(activeSwaggerDoc, null, 2), "utf-8");
 console.log(`[DOCS] Generated ${swaggerJsonPath}`);
+
+const swaggerSrcDocsPath = path.join(serverRootDir, "src", "docs", "swagger.json");
+fs.writeFileSync(swaggerSrcDocsPath, JSON.stringify(activeSwaggerDoc, null, 2), "utf-8");
+console.log(`[DOCS] Generated ${swaggerSrcDocsPath}`);
 
 // 2. Generate Postman Collection v2.1.0 format
 interface PostmanItem {
@@ -180,20 +184,20 @@ const postmanCollection = {
     })),
 };
 
-// Write Postman Collection to repository root directory
-const postmanOutputPath = path.join(workspaceRootDir, "AP-Tech.postman_collection.json");
+// 2. Write Postman Collection to server root directory
+const postmanOutputPath = path.join(serverRootDir, "AP-Tech.postman_collection.json");
 fs.writeFileSync(postmanOutputPath, JSON.stringify(postmanCollection, null, 2), "utf-8");
-console.log(`[DOCS] Generated Postman Collection at repository root: ${postmanOutputPath}`);
+console.log(`[DOCS] Generated Postman Collection at server root: ${postmanOutputPath}`);
 
-// Clean up duplicates from App and App/server if they exist
-const appDuplicatePath = path.join(appDir, "AP-Tech.postman_collection.json");
-if (fs.existsSync(appDuplicatePath)) {
-  fs.unlinkSync(appDuplicatePath);
-  console.log(`[DOCS] Cleaned up duplicate collection file at: ${appDuplicatePath}`);
+// Clean up legacy collection files from repository/app root if they exist
+const workspaceLegacyPath = path.join(workspaceRootDir, "AP-Tech.postman_collection.json");
+if (fs.existsSync(workspaceLegacyPath)) {
+  fs.unlinkSync(workspaceLegacyPath);
+  console.log(`[DOCS] Cleaned up legacy collection file at: ${workspaceLegacyPath}`);
 }
 
-const serverDuplicatePath = path.join(serverRootDir, "AP-Tech.postman_collection.json");
-if (fs.existsSync(serverDuplicatePath)) {
-  fs.unlinkSync(serverDuplicatePath);
-  console.log(`[DOCS] Cleaned up duplicate collection file at: ${serverDuplicatePath}`);
+const appLegacyPath = path.join(appDir, "AP-Tech.postman_collection.json");
+if (fs.existsSync(appLegacyPath)) {
+  fs.unlinkSync(appLegacyPath);
+  console.log(`[DOCS] Cleaned up legacy collection file at: ${appLegacyPath}`);
 }
