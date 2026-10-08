@@ -6,7 +6,7 @@ export const swaggerDocument = {
     description:
       "Enterprise API documentation for the AP-Tech Digital Prepaid Card, Single Sign-On (SSO), and Hubble Money Rewards & Voucher Marketplace platform.\n\n" +
       "### Key Features\n" +
-      "- **Authentication & SSO:** Non-student registration with OTP, student credential login, and Aptech ProConnect OAuth2/SSO authorization code exchange.\n" +
+      "- **Authentication & SSO:** Aptech ProConnect OAuth2/SSO authorization code exchange (`/auth/sso/exchange`), session renewal (`/auth/refresh`), profile verification (`/auth/me`), and logout (`/auth/logout`).\n" +
       "- **Card Issuance & Banking:** TransBnk (TrustHub) RuPay Virtual GPR prepaid card issuance, Min KYC, Aadhaar e-KYC/PAN Full KYC, fund loading (APIs 1–7), and PCI-DSS CardSDK session management.\n" +
       "- **Hubble Rewards & Vouchers:** Live Aptech Coin Ledger balance querying, atomic voucher debits, two-phase rollbacks, and AES-256 encrypted webhook delivery.\n\n" +
       "### Authentication\n" +
@@ -35,7 +35,7 @@ export const swaggerDocument = {
   tags: [
     {
       name: "Authentication & SSO",
-      description: "Student signup, OTP verification, credential login, token rotation, and ProConnect SSO",
+      description: "Aptech ProConnect SSO authorization code exchange, token rotation, profile verification, and session logout",
     },
     {
       name: "Card Issuance & KYC",
@@ -64,7 +64,7 @@ export const swaggerDocument = {
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
-        description: "Standard JWT Access Token obtained from /auth/login, /auth/verify-otp, or /auth/sso/exchange",
+        description: "Standard JWT Access Token obtained from /auth/sso/exchange",
       },
       cookieAuth: {
         type: "apiKey",
@@ -105,57 +105,6 @@ export const swaggerDocument = {
             type: "array",
             items: { type: "object" },
           },
-        },
-      },
-      SignupRequest: {
-        type: "object",
-        required: ["name", "email", "mobile", "highestEducation", "password", "confirmPassword"],
-        properties: {
-          name: { type: "string", example: "Rohan Verma", description: "Full legal name" },
-          email: { type: "string", format: "email", example: "rohan.verma@example.com" },
-          mobile: { type: "string", example: "9876543210", description: "10-digit Indian mobile number" },
-          highestEducation: {
-            type: "string",
-            enum: [
-              "High School / 10th",
-              "Higher Secondary / 12th",
-              "Diploma",
-              "Undergraduate / Bachelor's",
-              "Postgraduate / Master's",
-              "Doctorate / PhD",
-              "Other",
-            ],
-            example: "Undergraduate / Bachelor's",
-          },
-          city: { type: "string", example: "Mumbai" },
-          password: {
-            type: "string",
-            format: "password",
-            minLength: 8,
-            example: "Password@123",
-            description: "Must contain at least 1 uppercase letter, 1 lowercase letter, and 1 digit",
-          },
-          confirmPassword: { type: "string", format: "password", example: "Password@123" },
-        },
-      },
-      VerifyOtpRequest: {
-        type: "object",
-        required: ["mobile", "otp"],
-        properties: {
-          mobile: { type: "string", example: "9876543210" },
-          otp: { type: "string", example: "123456", description: "6-digit OTP received via SMS" },
-        },
-      },
-      LoginRequest: {
-        type: "object",
-        required: ["identifier", "password"],
-        properties: {
-          identifier: {
-            type: "string",
-            example: "9876543210",
-            description: "10-digit mobile number or registered email address",
-          },
-          password: { type: "string", format: "password", example: "Password@123" },
         },
       },
       SsoExchangeRequest: {
@@ -291,106 +240,6 @@ export const swaggerDocument = {
     },
   },
   paths: {
-    "/auth/signup": {
-      post: {
-        tags: ["Authentication & SSO"],
-        summary: "Initiate non-student signup & dispatch OTP",
-        description: "Registers prospective students who intend to apply for the card, hashes password, and dispatches SMS OTP.",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/SignupRequest" },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "Signup initiated; OTP dispatched",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/ApiResponseEnvelope" },
-              },
-            },
-          },
-          409: {
-            description: "Mobile number already registered",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/ApiErrorEnvelope" },
-              },
-            },
-          },
-        },
-      },
-    },
-    "/auth/verify-otp": {
-      post: {
-        tags: ["Authentication & SSO"],
-        summary: "Verify mobile OTP & complete onboarding",
-        description: "Validates 6-digit OTP, activates student profile, initializes Card record, pushes lead to ApTrack CRM, and sets auth cookies.",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/VerifyOtpRequest" },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "Account activated and tokens issued",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/ApiResponseEnvelope" },
-              },
-            },
-          },
-          400: { description: "Invalid or expired OTP" },
-        },
-      },
-    },
-    "/auth/resend-otp": {
-      post: {
-        tags: ["Authentication & SSO"],
-        summary: "Resend mobile signup OTP",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["mobile"],
-                properties: { mobile: { type: "string", example: "9876543210" } },
-              },
-            },
-          },
-        },
-        responses: {
-          200: { description: "New OTP dispatched successfully" },
-        },
-      },
-    },
-    "/auth/login": {
-      post: {
-        tags: ["Authentication & SSO"],
-        summary: "Student login with mobile/email + password",
-        description: "Authenticates existing student credentials, returns JWT token, and sets secure HTTP-only cookies.",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/LoginRequest" },
-            },
-          },
-        },
-        responses: {
-          200: { description: "Login successful" },
-          401: { description: "Invalid credentials" },
-          403: { description: "Mobile number unverified" },
-        },
-      },
-    },
     "/auth/refresh": {
       post: {
         tags: ["Authentication & SSO"],
@@ -835,16 +684,19 @@ export const swaggerDocument = {
 export type DocsAudience = "student_production" | "internal_full";
 
 export const EXCLUDED_STUDENT_PATHS = [
-  "/auth/signup",
-  "/auth/verify-otp",
-  "/auth/resend-otp",
-  "/auth/login",
   "/auth/sso/simulate-code",
   "/card/mock-complete-kyc",
 ] as const;
 
-export function getFilteredSwaggerDocument(audience?: string) {
-  const selectedAudience = audience === "internal_full" ? "internal_full" : "student_production";
+export function resolveDocsAudience(nodeEnv?: string, explicitAudience?: string): DocsAudience {
+  if (explicitAudience === "internal_full" || explicitAudience === "student_production") {
+    return explicitAudience;
+  }
+  return nodeEnv === "production" ? "student_production" : "internal_full";
+}
+
+export function getFilteredSwaggerDocument(audience?: string, nodeEnv?: string) {
+  const selectedAudience = resolveDocsAudience(nodeEnv || process.env.NODE_ENV, audience);
 
   if (selectedAudience === "internal_full") {
     return swaggerDocument;
@@ -859,9 +711,6 @@ export function getFilteredSwaggerDocument(audience?: string) {
     }
   }
 
-  // Filter out request schemas that are only used by the removed endpoints to keep the schema clean
-  const { SignupRequest, VerifyOtpRequest, LoginRequest, ...remainingSchemas } = swaggerDocument.components.schemas;
-
   return {
     ...swaggerDocument,
     info: {
@@ -869,7 +718,7 @@ export function getFilteredSwaggerDocument(audience?: string) {
       description:
         "Enterprise API documentation for the AP-Tech Digital Prepaid Card, Aptech ProConnect SSO, and Hubble Money Rewards platform (Student Production View).\n\n" +
         "### Key Modules\n" +
-        "- **Authentication & ProConnect SSO:** Student single sign-on authorization exchange (`/auth/sso/exchange`), session renewal (`/auth/refresh`), profile verification (`/auth/me`), and logout (`/auth/logout`). Direct signup and credential authentication endpoints are disabled for student-only production environments.\n" +
+        "- **Authentication & ProConnect SSO:** Student single sign-on authorization exchange (`/auth/sso/exchange`), session renewal (`/auth/refresh`), profile verification (`/auth/me`), and logout (`/auth/logout`).\n" +
         "- **Card Issuance & Banking:** TransBnk (TrustHub) RuPay Virtual GPR prepaid card issuance, Min KYC, Aadhaar e-KYC/PAN Full KYC, fund loading (APIs 1–7), and PCI-DSS CardSDK session management.\n" +
         "- **Hubble Rewards & Vouchers:** Live Aptech Coin Ledger balance querying, atomic voucher debits, two-phase rollbacks, and AES-256 encrypted webhook delivery.\n\n" +
         "### Authentication\n" +
@@ -888,7 +737,6 @@ export function getFilteredSwaggerDocument(audience?: string) {
     }),
     components: {
       ...swaggerDocument.components,
-      schemas: remainingSchemas,
     },
     paths: filteredPaths,
   };

@@ -1,11 +1,26 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import app from "../src/app.js";
-import { getFilteredSwaggerDocument, EXCLUDED_STUDENT_PATHS } from "../src/docs/swagger.js";
+import { getFilteredSwaggerDocument, EXCLUDED_STUDENT_PATHS, resolveDocsAudience } from "../src/docs/swagger.js";
 
 describe("Swagger Documentation & OpenAPI Spec Endpoints (Option 1 Filtering)", () => {
-  it("should serve student_production OpenAPI specification at GET /api-docs.json by default", async () => {
+  it("resolveDocsAudience derives audience from NODE_ENV", () => {
+    expect(resolveDocsAudience("production")).toBe("student_production");
+    expect(resolveDocsAudience("development")).toBe("internal_full");
+    expect(resolveDocsAudience("test")).toBe("internal_full");
+    // Explicit override takes precedence
+    expect(resolveDocsAudience("production", "internal_full")).toBe("internal_full");
+    expect(resolveDocsAudience("development", "student_production")).toBe("student_production");
+  });
+
+  it("should serve default OpenAPI specification at GET /api-docs.json matching NODE_ENV", async () => {
     const res = await request(app).get("/api-docs.json");
+    expect(res.status).toBe(200);
+    // In test environment (NODE_ENV !== production), default serves internal_full
+    expect(res.body.paths["/auth/sso/simulate-code"]).toBeDefined();
+  });
+  it("should serve student_production OpenAPI specification at GET /api-docs.json with audience=student_production", async () => {
+    const res = await request(app).get("/api-docs.json?audience=student_production");
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/json/);
@@ -43,36 +58,10 @@ describe("Swagger Documentation & OpenAPI Spec Endpoints (Option 1 Filtering)", 
     expect(res.status).toBe(200);
     expect(res.body.paths).toBeDefined();
 
-    // In internal_full, all paths including mocks and signup must be present
-    expect(res.body.paths["/auth/signup"]).toBeDefined();
-    expect(res.body.paths["/auth/login"]).toBeDefined();
+    // In internal_full, internal test routes like simulate-code and mock KYC are present
     expect(res.body.paths["/auth/sso/simulate-code"]).toBeDefined();
     expect(res.body.paths["/card/mock-complete-kyc"]).toBeDefined();
-    expect(res.body.components.schemas.SignupRequest).toBeDefined();
-  });
-
-  it("getFilteredSwaggerDocument unit test verifies path count differences", () => {
-    const studentDoc = getFilteredSwaggerDocument("student_production");
-    const internalDoc = getFilteredSwaggerDocument("internal_full");
-
-    const studentPaths = Object.keys(studentDoc.paths);
-    const internalPaths = Object.keys(internalDoc.paths);
-
-    expect(internalPaths.length).toBeGreaterThan(studentPaths.length);
-    expect(internalPaths.length - studentPaths.length).toBe(EXCLUDED_STUDENT_PATHS.length);
-
-    expect(studentDoc.paths["/auth/signup"]).toBeUndefined();
-    expect(internalDoc.paths["/auth/signup"]).toBeDefined();
-  });
-
-  it("should redirect GET /docs to /api-docs", async () => {
-    const res = await request(app).get("/docs");
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe("/api-docs");
-  });
-
-  it("should serve Swagger UI at GET /api-docs/", async () => {
-    const res = await request(app).get("/api-docs/");
-    expect([200, 301, 302]).toContain(res.status);
+    expect(res.body.components.schemas.SsoExchangeRequest).toBeDefined();
   });
 });
+

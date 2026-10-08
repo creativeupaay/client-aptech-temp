@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthPage, SSOCallbackPage } from "./features/auth";
+import { AccessViaProconnectPage, SSOCallbackPage } from "./features/auth";
 import { StudentDashboardPage } from "./features/dashboard";
 import {
   CardIssuancePage,
@@ -14,30 +14,12 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default route redirects to signup if guest, dashboard if logged in */}
+        {/* Default route renders AccessViaProconnectPage (or redirects to dashboard if authenticated) */}
         <Route
           path="/"
           element={
             <PublicRoute>
-              <Navigate to="/signup" replace />
-            </PublicRoute>
-          }
-        />
-
-        {/* Public guest routes */}
-        <Route
-          path="/signup"
-          element={
-            <PublicRoute>
-              <AuthPage initialMode="signup" />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <AuthPage initialMode="login" />
+              <AccessViaProconnectPage />
             </PublicRoute>
           }
         />
@@ -95,8 +77,8 @@ function App() {
           }
         />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/signup" replace />} />
+        {/* Catch-all redirects to root SSO entrance */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

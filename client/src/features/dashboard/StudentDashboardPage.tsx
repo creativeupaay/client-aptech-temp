@@ -131,7 +131,7 @@ export const StudentDashboardPage: React.FC = () => {
       clearCardSdkSession();
       localStorage.removeItem("tbx_auth_token");
       localStorage.removeItem("tbx_student_user");
-      navigate("/login", { replace: true });
+      navigate("/", { replace: true });
     }
   };
 

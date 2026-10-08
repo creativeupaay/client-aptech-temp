@@ -119,11 +119,6 @@ const envSchema = z.object({
   TRANSBNK_PROVIDER: z
     .enum(["mock", "http"])
     .default((process.env.TRANSBNK_PROVIDER as "mock" | "http") || "mock"),
-
-  // Documentation Audience ("student_production" or "internal_full")
-  DOCS_AUDIENCE: z
-    .enum(["student_production", "internal_full"])
-    .default((process.env.DOCS_AUDIENCE as "student_production" | "internal_full") || "student_production"),
 }).superRefine((data, ctx) => {
   if (data.NODE_ENV === "production" && data.TRANSBNK_PROVIDER === "http") {
     if (data.TRANSBNK_API_KEY === "sandbox_api_key") {
@@ -165,5 +160,21 @@ if (!parsedEnv.success) {
   process.exit(1);
 }
 
-export const env = Object.freeze(parsedEnv.data);
-export type Env = z.infer<typeof envSchema>;
+export type DocsAudience = "student_production" | "internal_full";
+
+// Documentation audience is merged directly with NODE_ENV:
+// production -> student_production (public student APIs)
+// development/test -> internal_full (includes sandbox/dev helpers)
+const derivedDocsAudience: DocsAudience =
+  parsedEnv.data.NODE_ENV === "production" ? "student_production" : "internal_full";
+
+export const env = Object.freeze({
+  ...parsedEnv.data,
+  DOCS_AUDIENCE: derivedDocsAudience,
+  docsAudience: derivedDocsAudience,
+});
+
+export type Env = z.infer<typeof envSchema> & {
+  DOCS_AUDIENCE: DocsAudience;
+  docsAudience: DocsAudience;
+};

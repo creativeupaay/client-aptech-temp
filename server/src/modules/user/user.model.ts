@@ -19,9 +19,9 @@ export interface IUser {
   name: string;
   email: string;
   mobile: string;
-  highestEducation: HighestEducation;
+  highestEducation?: HighestEducation;
   city?: string;
-  passwordHash: string;
+  passwordHash?: string;
   role: UserRole;
   userType: UserType;
   studentId?: string;
@@ -61,11 +61,11 @@ const userSchema = new Schema<IUserDocument>(
     },
     highestEducation: {
       type: String,
-      required: [true, "Highest education is required"],
       enum: {
         values: HIGHEST_EDUCATION_OPTIONS,
         message: "{VALUE} is not a supported education qualification",
       },
+      default: "Undergraduate / Bachelor's",
     },
     city: {
       type: String,
@@ -75,7 +75,7 @@ const userSchema = new Schema<IUserDocument>(
     },
     passwordHash: {
       type: String,
-      required: [true, "Password is required"],
+      required: false,
       select: false,
     },
     role: {
@@ -86,7 +86,7 @@ const userSchema = new Schema<IUserDocument>(
     userType: {
       type: String,
       enum: ["non_aptech_student", "aptech_student"],
-      default: "non_aptech_student",
+      default: "aptech_student",
     },
     studentId: {
       type: String,
@@ -96,7 +96,7 @@ const userSchema = new Schema<IUserDocument>(
     },
     isMobileVerified: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     isEmailVerified: {
       type: Boolean,
@@ -105,7 +105,7 @@ const userSchema = new Schema<IUserDocument>(
     status: {
       type: String,
       enum: ["pending_verification", "active", "suspended"],
-      default: "pending_verification",
+      default: "active",
     },
   },
   {
@@ -120,9 +120,10 @@ const userSchema = new Schema<IUserDocument>(
   }
 );
 
-// Method to verify candidate password
+// Method to verify candidate password (safe fallback for accounts without passwords)
 userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
-  const user = this as unknown as { passwordHash: string };
+  const user = this as unknown as { passwordHash?: string };
+  if (!user.passwordHash) return false;
   return bcrypt.compare(candidatePassword, user.passwordHash);
 };
 

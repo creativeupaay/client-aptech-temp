@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getFilteredSwaggerDocument } from "../src/docs/swagger.js";
+import { getFilteredSwaggerDocument, resolveDocsAudience } from "../src/docs/swagger.js";
 import { env } from "../src/env.config.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,7 +10,7 @@ const serverRootDir = path.resolve(__dirname, "..");
 const appDir = path.resolve(serverRootDir, "..");
 const workspaceRootDir = path.resolve(appDir, "..");
 
-const audience = process.env.DOCS_AUDIENCE || env.DOCS_AUDIENCE || "student_production";
+const audience = resolveDocsAudience(env.NODE_ENV, process.env.AUDIENCE || process.env.DOCS_AUDIENCE);
 const activeSwaggerDoc = getFilteredSwaggerDocument(audience);
 
 console.log(`[DOCS] Generating API documentation with audience: ${audience}`);

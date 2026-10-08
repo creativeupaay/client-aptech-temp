@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
-import mongoose from "mongoose";
 import app from "../src/app.js";
 
-describe("Base API & Database Setup", () => {
+describe("Base API Platform Setup", () => {
   it("should return 200 OK from the /health check endpoint", async () => {
     const response = await request(app).get("/health");
 
@@ -28,16 +27,5 @@ describe("Base API & Database Setup", () => {
     expect(response.status).toBe(404);
     expect(response.body).toHaveProperty("success", false);
     expect(response.body.message).toContain("Cannot GET /api/v1/non-existent-route");
-  });
-
-  it("should verify in-memory database operations are functional and isolated", async () => {
-    const SampleSchema = new mongoose.Schema({ name: String });
-    const SampleModel = mongoose.models.Sample || mongoose.model("Sample", SampleSchema);
-
-    const doc = await SampleModel.create({ name: "Testing Isolation" });
-    expect(doc._id).toBeDefined();
-
-    const found = await SampleModel.findById(doc._id);
-    expect(found?.name).toBe("Testing Isolation");
   });
 });

@@ -1,4 +1,2 @@
-export { AuthPage } from "./AuthPage";
+export { AccessViaProconnectPage } from "./AccessViaProconnectPage";
 export { SSOCallbackPage } from "./SSOCallbackPage";
-
-

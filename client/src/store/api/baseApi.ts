@@ -30,7 +30,7 @@ const baseQueryWithReauth: BaseQueryFn<
   // If 401 occurs, attempt silent token refresh via HTTP-only cookie
   if (result.error && result.error.status === 401) {
     const url = typeof args === "string" ? args : args.url;
-    if (!url.includes("/auth/login") && !url.includes("/auth/refresh")) {
+    if (!url.includes("/auth/refresh")) {
       const refreshResult = await rawBaseQuery(
         { url: "/auth/refresh", method: "POST" },
         api,

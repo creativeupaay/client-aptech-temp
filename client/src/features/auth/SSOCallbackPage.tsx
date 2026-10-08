@@ -38,11 +38,15 @@ export const SSOCallbackPage: React.FC = () => {
           localStorage.setItem("tbx_student_user", JSON.stringify(response.data.user));
         }
 
-        // Brief delay for user feedback, then transition to dashboard or issuance
+        // Brief delay for user feedback, then transition to dashboard, status, or issuance
         setTimeout(() => {
           const cardStatus = response.data?.card?.status;
-          const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
-          navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
+          if (cardStatus === "APPLICATION_PENDING") {
+            navigate("/card/status", { replace: true });
+          } else {
+            const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
+            navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
+          }
         }, 1200);
       } catch (err: unknown) {
         interface ApiErrorResponse {
@@ -148,11 +152,11 @@ export const SSOCallbackPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
               <button
                 type="button"
-                onClick={() => navigate("/login", { replace: true })}
+                onClick={() => navigate("/", { replace: true })}
                 className="w-full sm:flex-1 py-2.5 px-4 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <ArrowLeft size={14} />
-                <span>Return to Login</span>
+                <span>Return to Home</span>
               </button>
 
               <button

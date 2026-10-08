@@ -19,14 +19,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // If no token exists, immediately redirect to login
   if (!token) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // If session check failed (e.g. invalid/expired token), clean up and redirect
   if (isError) {
     localStorage.removeItem("tbx_auth_token");
     localStorage.removeItem("tbx_student_user");
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // If still verifying within the 250ms threshold, render a clean blank background

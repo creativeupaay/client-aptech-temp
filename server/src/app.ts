@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import swaggerUi from "swagger-ui-express";
-import { getFilteredSwaggerDocument } from "./docs/swagger.js";
+import { getFilteredSwaggerDocument, resolveDocsAudience } from "./docs/swagger.js";
 import { env } from "./env.config.js";
 import v1Router from "./routes/v1/index.js";
 import { notFoundHandler } from "./middlewares/notFound.middleware.js";
@@ -71,13 +71,15 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "healthy",
+    environment: env.NODE_ENV,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
 });
 
-// Interactive Swagger UI documentation
-const activeSwaggerDoc = getFilteredSwaggerDocument(env.DOCS_AUDIENCE);
+// Interactive Swagger UI documentation (Audience derived from NODE_ENV)
+const defaultAudience = resolveDocsAudience(env.NODE_ENV);
+const activeSwaggerDoc = getFilteredSwaggerDocument(defaultAudience);
 
 // Prevent browser from caching Swagger UI init specs across environment changes
 app.use("/api-docs", (_req: Request, res: Response, next: NextFunction) => {
@@ -90,7 +92,7 @@ app.use(
   swaggerUi.serve,
   swaggerUi.setup(activeSwaggerDoc, {
     customSiteTitle:
-      env.DOCS_AUDIENCE === "student_production"
+      defaultAudience === "student_production"
         ? "AP-Tech Banking & Card Platform API Documentation (Student View)"
         : "AP-Tech Banking & Card Platform API Documentation (Internal Full)",
     swaggerOptions: {
@@ -108,7 +110,7 @@ app.get("/docs", (_req: Request, res: Response) => {
 
 // Raw OpenAPI JSON specification (for Postman Import & CI/CD)
 app.get("/api-docs.json", (req: Request, res: Response) => {
-  const audience = (req.query.audience as string) || env.DOCS_AUDIENCE;
+  const audience = resolveDocsAudience(env.NODE_ENV, req.query.audience as string);
   res.setHeader("Content-Type", "application/json");
   res.status(200).json(getFilteredSwaggerDocument(audience));
 });

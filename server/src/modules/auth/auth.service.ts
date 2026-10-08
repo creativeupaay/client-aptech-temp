@@ -1,21 +1,11 @@
-import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { type Response } from "express";
 import { env } from "../../env.config.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { User, type IUserDocument } from "../user/user.model.js";
 import { Card } from "../card/card.model.js";
-import { OtpService } from "../otp/otp.service.js";
 import { ProconnectFactory, type ProconnectStudentProfile } from "../../services/proconnect/index.js";
-import { AptrackFactory } from "../../services/aptrack/index.js";
-import {
-  type SignupInput,
-  type VerifyOtpInput,
-  type ResendOtpInput,
-  type LoginInput,
-  sanitizeMobileNumber,
-} from "./auth.validation.js";
+import { sanitizeMobileNumber } from "./auth.validation.js";
 
 export interface TokenPayload {
   id: string;
@@ -91,224 +81,11 @@ export class AuthService {
   }
 
   /**
-   * Handles non-Aptech student registration initiation.
-   * If an unverified registration exists, updates profile and dispatches a fresh OTP.
-   */
-  public static async signup(data: SignupInput) {
-    const existingUser = await User.findOne({ mobile: data.mobile });
-
-    if (existingUser && existingUser.isMobileVerified) {
-      throw ApiError.conflict("An account with this mobile number already exists. Please login instead.");
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-
-    let user: IUserDocument;
-
-    if (existingUser && !existingUser.isMobileVerified) {
-      // Prior uncompleted signup: update details and re-send OTP
-      existingUser.name = data.name;
-      existingUser.email = data.email;
-      existingUser.highestEducation = data.highestEducation;
-      if (data.city) existingUser.city = data.city;
-      existingUser.passwordHash = passwordHash;
-      user = await existingUser.save();
-    } else {
-      // New user signup
-      user = await User.create({
-        name: data.name,
-        email: data.email,
-        mobile: data.mobile,
-        highestEducation: data.highestEducation,
-        city: data.city,
-        passwordHash,
-        isMobileVerified: false,
-        status: "pending_verification",
-        userType: "non_aptech_student",
-        role: "student",
-      });
-    }
-
-    // Generate & send OTP
-    const otpResult = await OtpService.generateAndSendOtp(user.mobile, "SIGNUP_VERIFICATION");
-
-    return {
-      message: "Registration initiated. Verification OTP has been sent to your mobile number.",
-      mobile: user.mobile,
-      isNewUser: !existingUser,
-      ...(otpResult.otpForDev ? { debugOtp: otpResult.otpForDev } : {}),
-    };
-  }
-
-  /**
-   * Verifies mobile OTP, activates user account, initializes lean Card linkage, and issues tokens.
-   */
-  public static async verifyOtp(data: VerifyOtpInput) {
-    const user = await User.findOne({ mobile: data.mobile });
-
-    if (!user) {
-      throw ApiError.notFound("No account found with this mobile number. Please complete signup first.");
-    }
-
-    // Verify OTP against secure hash & TTL
-    await OtpService.verifyOtp(data.mobile, data.otp, "SIGNUP_VERIFICATION");
-
-    // Activate user
-    user.isMobileVerified = true;
-    user.status = "active";
-    await user.save();
-
-    // Initialize or get lean student card linkage
-    const card = await Card.findOneAndUpdate(
-      { userId: user._id },
-      {
-        $setOnInsert: {
-          userId: user._id,
-          status: "NOT_APPLIED",
-          cardType: "VIRTUAL",
-          kycStatus: "MIN_KYC",
-          isLocked: false,
-        },
-      },
-      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
-    );
-
-    // Generate Access & Refresh tokens
-    const tokens = this.generateTokens(user);
-
-    // Push prospect lead to ApTrack CRM (Milestone 7 of Functional Spec)
-    if (user.userType === "non_aptech_student") {
-      AptrackFactory.getProvider()
-        .createProspectLead({
-          leadType: "PROSPECT_STUDENT",
-          name: user.name,
-          mobile: user.mobile,
-          email: user.email,
-          highestEducation: user.highestEducation,
-          city: user.city,
-          channel: "WEB_PORTAL",
-          cardStatus: card.status,
-        })
-        .catch((err) => console.warn("[APTRACK] Non-blocking lead sync error:", err));
-    }
-
-    return {
-      message: "Mobile verified successfully. Welcome to Aptech Student Card dashboard!",
-      token: tokens.accessToken,
-      tokens,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        highestEducation: user.highestEducation,
-        isMobileVerified: user.isMobileVerified,
-        status: user.status,
-        userType: user.userType,
-        role: user.role,
-      },
-      card: {
-        status: card.status,
-        cardType: card.cardType,
-        kycStatus: card.kycStatus,
-        maskedPan: card.maskedPan,
-      },
-    };
-  }
-
-  /**
-   * Resends verification OTP to the user's mobile number.
-   */
-  public static async resendOtp(data: ResendOtpInput) {
-    const user = await User.findOne({ mobile: data.mobile });
-
-    if (!user) {
-      throw ApiError.notFound("No account found with this mobile number. Please sign up first.");
-    }
-
-    if (user.isMobileVerified) {
-      throw ApiError.badRequest("Your mobile number is already verified. Please proceed to login.");
-    }
-
-    const otpResult = await OtpService.generateAndSendOtp(user.mobile, "SIGNUP_VERIFICATION");
-
-    return {
-      message: "A new OTP has been dispatched to your registered mobile number.",
-      mobile: user.mobile,
-      ...(otpResult.otpForDev ? { debugOtp: otpResult.otpForDev } : {}),
-    };
-  }
-
-  /**
-   * Authenticates an existing student using registered Mobile Number or Email + Password.
-   */
-  public static async login(data: LoginInput) {
-    const rawIdentifier = data.identifier.trim();
-    const sanitizedMobile = sanitizeMobileNumber(rawIdentifier);
-    const isMobile = /^[6-9]\d{9}$/.test(sanitizedMobile);
-
-    const query = isMobile
-      ? { mobile: sanitizedMobile }
-      : { email: rawIdentifier.toLowerCase() };
-
-    const user = await User.findOne(query).select("+passwordHash");
-
-    if (!user) {
-      throw ApiError.unauthorized("Invalid credentials entered.");
-    }
-
-    const isPasswordValid = await user.comparePassword(data.password);
-    if (!isPasswordValid) {
-      throw ApiError.unauthorized("Invalid credentials entered.");
-    }
-
-    if (!user.isMobileVerified) {
-      throw new ApiError(
-        403,
-        "Mobile number has not been verified. Please complete verification before logging in."
-      );
-    }
-
-    if (user.status === "suspended") {
-      throw ApiError.forbidden("Your account is currently suspended. Please contact support.");
-    }
-
-    // Fetch card status
-    const card = await Card.findOne({ userId: user._id });
-
-    // Generate Access & Refresh tokens
-    const tokens = this.generateTokens(user);
-
-    return {
-      message: "Login successful.",
-      token: tokens.accessToken,
-      tokens,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        highestEducation: user.highestEducation,
-        isMobileVerified: user.isMobileVerified,
-        status: user.status,
-        userType: user.userType,
-        role: user.role,
-      },
-      card: {
-        status: card?.status ?? "NOT_APPLIED",
-        cardType: card?.cardType ?? "VIRTUAL",
-        kycStatus: card?.kycStatus ?? "MIN_KYC",
-        maskedPan: card?.maskedPan ?? null,
-      },
-    };
-  }
-
-  /**
    * Refreshes an expired access token using the HTTP-only refresh token.
    */
   public static async refreshSession(refreshTokenString?: string) {
     if (!refreshTokenString) {
-      throw ApiError.unauthorized("Refresh token is missing. Please log in again.");
+      throw ApiError.unauthorized("Refresh token is missing. Please log in again via Aptech ProConnect.");
     }
 
     const refreshSecret = env.JWT_REFRESH_SECRET;
@@ -317,12 +94,12 @@ export class AuthService {
     try {
       decoded = jwt.verify(refreshTokenString, refreshSecret) as TokenPayload;
     } catch {
-      throw ApiError.unauthorized("Invalid or expired refresh token. Please log in again.");
+      throw ApiError.unauthorized("Invalid or expired session. Please log in again via Aptech ProConnect.");
     }
 
     const user = await User.findById(decoded.id);
     if (!user || user.status === "suspended") {
-      throw ApiError.unauthorized("User session is no longer active. Please log in again.");
+      throw ApiError.unauthorized("User session is no longer active. Please log in again via Aptech ProConnect.");
     }
 
     const tokens = this.generateTokens(user);
@@ -390,35 +167,38 @@ export class AuthService {
       throw ApiError.badRequest("Invalid student mobile number received from ProConnect.");
     }
 
-    // Step 1: Look for existing student by studentId or mobile (priority to studentId)
+    // Step 1: Look for existing student by studentId, mobile, or email (priority to studentId)
     let user = await User.findOne({ studentId: studentProfile.studentId });
     if (!user) {
       user = await User.findOne({ mobile: sanitizedMobile });
     }
+    if (!user && studentProfile.email) {
+      user = await User.findOne({ email: studentProfile.email.toLowerCase().trim() });
+    }
 
     if (user) {
       // Step 2a: Automatic Account Linking
-      // Ensure studentId is in sync with the official studentId from ProConnect
+      // Ensure studentId and verified contact details are in sync with ProConnect
       user.studentId = studentProfile.studentId;
+      user.mobile = sanitizedMobile;
       user.userType = "aptech_student";
       user.isMobileVerified = true;
       user.status = "active";
       if (!user.name && studentProfile.name) {
         user.name = studentProfile.name;
       }
+      if (studentProfile.email && user.email !== studentProfile.email.toLowerCase().trim()) {
+        user.email = studentProfile.email.toLowerCase().trim();
+      }
       await user.save();
     } else {
-      // Step 2b: New Aptech student onboarding
-      const randomPassword = crypto.randomBytes(32).toString("hex");
-      const passwordHash = await bcrypt.hash(randomPassword, 10);
-
+      // Step 2b: New Aptech student onboarding via SSO
       user = await User.create({
         name: studentProfile.name,
         email: studentProfile.email.toLowerCase().trim(),
         mobile: sanitizedMobile,
         studentId: studentProfile.studentId,
         highestEducation: "Undergraduate / Bachelor's",
-        passwordHash,
         isMobileVerified: true,
         isEmailVerified: true,
         status: "active",
@@ -490,4 +270,3 @@ export class AuthService {
     };
   }
 }
-

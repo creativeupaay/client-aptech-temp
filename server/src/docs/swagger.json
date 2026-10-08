@@ -3,7 +3,7 @@
   "info": {
     "title": "AP-Tech (TBX) Banking & Card Platform API",
     "version": "1.0.0",
-    "description": "Enterprise API documentation for the AP-Tech Digital Prepaid Card, Aptech ProConnect SSO, and Hubble Money Rewards platform (Student Production View).\n\n### Key Modules\n- **Authentication & ProConnect SSO:** Student single sign-on authorization exchange (`/auth/sso/exchange`), session renewal (`/auth/refresh`), profile verification (`/auth/me`), and logout (`/auth/logout`). Direct signup and credential authentication endpoints are disabled for student-only production environments.\n- **Card Issuance & Banking:** TransBnk (TrustHub) RuPay Virtual GPR prepaid card issuance, Min KYC, Aadhaar e-KYC/PAN Full KYC, fund loading (APIs 1–7), and PCI-DSS CardSDK session management.\n- **Hubble Rewards & Vouchers:** Live Aptech Coin Ledger balance querying, atomic voucher debits, two-phase rollbacks, and AES-256 encrypted webhook delivery.\n\n### Authentication\n- **Student / Client Endpoints:** Require `Authorization: Bearer <accessToken>` or the HTTP-only `accessToken` cookie.\n- **Hubble Cloud Callbacks:** Require the `X-Hubble-Secret` header.\n- **Financial Operations:** Support `Idempotency-Key` headers.",
+    "description": "Enterprise API documentation for the AP-Tech Digital Prepaid Card, Single Sign-On (SSO), and Hubble Money Rewards & Voucher Marketplace platform.\n\n### Key Features\n- **Authentication & SSO:** Aptech ProConnect OAuth2/SSO authorization code exchange (`/auth/sso/exchange`), session renewal (`/auth/refresh`), profile verification (`/auth/me`), and logout (`/auth/logout`).\n- **Card Issuance & Banking:** TransBnk (TrustHub) RuPay Virtual GPR prepaid card issuance, Min KYC, Aadhaar e-KYC/PAN Full KYC, fund loading (APIs 1–7), and PCI-DSS CardSDK session management.\n- **Hubble Rewards & Vouchers:** Live Aptech Coin Ledger balance querying, atomic voucher debits, two-phase rollbacks, and AES-256 encrypted webhook delivery.\n\n### Authentication\n- **Student / Client Endpoints:** Require `Authorization: Bearer <accessToken>` or the HTTP-only `accessToken` cookie.\n- **Hubble Cloud Callbacks:** Require the `X-Hubble-Secret` header.\n- **Financial Operations:** Support `Idempotency-Key` headers.",
     "contact": {
       "name": "AP-Tech Integration Engineering Team",
       "email": "support@trusthub.in"
@@ -26,7 +26,7 @@
   "tags": [
     {
       "name": "Authentication & SSO",
-      "description": "Aptech ProConnect SSO token exchange, token rotation, student profile, and logout"
+      "description": "Aptech ProConnect SSO authorization code exchange, token rotation, profile verification, and session logout"
     },
     {
       "name": "Card Issuance & KYC",
@@ -55,7 +55,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Standard JWT Access Token obtained from /auth/login, /auth/verify-otp, or /auth/sso/exchange"
+        "description": "Standard JWT Access Token obtained from /auth/sso/exchange"
       },
       "cookieAuth": {
         "type": "apiKey",
@@ -457,6 +457,20 @@
         }
       }
     },
+    "/auth/sso/simulate-code": {
+      "post": {
+        "tags": [
+          "Authentication & SSO"
+        ],
+        "summary": "Generate simulated ProConnect SSO code (Dev/Sandbox)",
+        "description": "Helper endpoint to mint mock authorization codes for local development and UI callback testing.",
+        "responses": {
+          "200": {
+            "description": "Simulated code and redirect URL generated"
+          }
+        }
+      }
+    },
     "/auth/me": {
       "get": {
         "tags": [
@@ -672,6 +686,27 @@
         "responses": {
           "200": {
             "description": "Card limit enhanced to ₹2,00,000"
+          }
+        }
+      }
+    },
+    "/card/mock-complete-kyc": {
+      "post": {
+        "tags": [
+          "Card Issuance & KYC"
+        ],
+        "summary": "Mock Full KYC verification (Sandbox/Demo)",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Instant mock upgrade to ₹2,00,000"
           }
         }
       }
