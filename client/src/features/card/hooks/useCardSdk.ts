@@ -24,6 +24,9 @@ export const clearCardSdkSession = () => {
   // Clear any remaining sessionStorage items set by CardSDK
   try {
     sessionStorage.removeItem("cardsdk_session_token");
+    sessionStorage.removeItem("OXYMONEY_TOKEN");
+    sessionStorage.removeItem("OXYMONEY_USER_NUMBER");
+    sessionStorage.removeItem("OXYMONEY_LOGGED_IN");
   } catch {
     // Ignore storage access errors
   }
@@ -111,7 +114,19 @@ export const useCardSdk = () => {
       environment?: string,
       customOnError?: (error: SDKError) => void
     ) => {
-      if (!sdkInstanceRef.current) {
+      if (
+        !sdkInstanceRef.current ||
+        (sdkInstanceRef.current as any).config?.clientId !== clientId ||
+        (sdkInstanceRef.current as any).config?.clientToken !== clientToken
+      ) {
+        if (sdkInstanceRef.current) {
+          try {
+            sdkInstanceRef.current.clearSession();
+          } catch {
+            // ignore
+          }
+        }
+
         const instance = new CardSDK({
           clientId,
           clientToken,
@@ -147,6 +162,14 @@ export const useCardSdk = () => {
           throw new Error("Card SDK session credentials not available.");
         }
 
+        // If the mobile number in session storage does not match current session, reset SDK session
+        const currentSavedMobile = sessionStorage.getItem("OXYMONEY_USER_NUMBER");
+        if (currentSavedMobile && currentSavedMobile !== session.mobileNumber) {
+          clearCardSdkSession();
+        }
+
+        const effectiveCardId = options?.cardId || session.cardId || undefined;
+
         const sdk = getSdkInstance(
           session.clientId,
           session.clientToken,
@@ -156,7 +179,7 @@ export const useCardSdk = () => {
 
         await sdk.start({
           mobileNumber: session.mobileNumber,
-          cardId: options?.cardId || session.cardId || undefined,
+          cardId: effectiveCardId,
           onClose: options?.onClose,
         });
 

@@ -6,9 +6,10 @@ import { Loader2, AlertCircle, ShieldCheck, SlidersHorizontal } from "lucide-rea
 interface CardControlsProps {
   maskedPan?: string;
   holderName?: string;
+  onRefreshCard?: () => void;
 }
 
-export const CardControls: React.FC<CardControlsProps> = () => {
+export const CardControls: React.FC<CardControlsProps> = ({ onRefreshCard }) => {
   const [isLaunching, setIsLaunching] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -18,7 +19,11 @@ export const CardControls: React.FC<CardControlsProps> = () => {
     setErrorMsg(null);
     setIsLaunching(true);
     try {
-      await launchSdk();
+      await launchSdk({
+        onClose: () => {
+          onRefreshCard?.();
+        },
+      });
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to open Oxymoney Card SDK.");
     } finally {

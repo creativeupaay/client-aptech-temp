@@ -157,6 +157,7 @@ export const cardApi = baseApi.injectEndpoints({
 
     getCardSdkSession: builder.query<{ success: boolean; data: CardSdkSessionResponse }, void>({
       query: () => "/card/sdk-session",
+      providesTags: ["Card"],
     }),
 
     completeFullKyc: builder.mutation<

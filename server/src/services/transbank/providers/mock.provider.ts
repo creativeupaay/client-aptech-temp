@@ -158,6 +158,10 @@ export class MockTransbankProvider implements ITransbankProvider {
   }
 
   public async getClientToken(): Promise<string> {
-    return `mock_client_token_${Date.now()}`;
+    return (
+      process.env.OXYMONEY_CLIENT_TOKEN ||
+      process.env.TRANSBNK_CLIENT_PASSWORD ||
+      "U7+a4uyR+msFcVv9G6cBMc7NypJnjIYXMGHLJLVKJgE="
+    );
   }
 }

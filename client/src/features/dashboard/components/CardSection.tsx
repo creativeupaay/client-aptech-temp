@@ -15,6 +15,7 @@ interface CardSectionProps {
   expiry?: string;
   cvv?: string;
   onViewDetails?: () => void;
+  onRefreshCard?: () => void;
 }
 
 /** EMV Chip SVG matching the exact card design */
@@ -96,6 +97,7 @@ export const CardSection: React.FC<CardSectionProps> = ({
   maskedPan = "•••• •••• •••• ••••",
   expiry = "••/••",
   onViewDetails,
+  onRefreshCard,
 }) => {
   const { launchSdk } = useCardSdk();
   const [isLaunchingSdk, setIsLaunchingSdk] = useState(false);
@@ -110,7 +112,11 @@ export const CardSection: React.FC<CardSectionProps> = ({
     setSdkError(null);
     setIsLaunchingSdk(true);
     try {
-      await launchSdk();
+      await launchSdk({
+        onClose: () => {
+          onRefreshCard?.();
+        },
+      });
     } catch (err: unknown) {
       setSdkError(err instanceof Error ? err.message : "Failed to open official Card SDK.");
     } finally {

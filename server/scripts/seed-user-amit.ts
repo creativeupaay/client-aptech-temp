@@ -8,13 +8,13 @@ async function seedAmit() {
   await mongoose.connect(env.MONGO_URI);
   console.log("Connected to MongoDB successfully.");
 
-  const mobile = "8000257053";
+  const mobile = "9834744826";
   const name = "Amit Sunda";
   const email = "amit.sunda14@example.com";
   const studentId = "APT-2026-89490";
-  const senderTag = "dc22def0-1137-4063-be02-2243c72c0b11";
-  const cardId = "81eff9ac-f1ce-4148-9f27-9f8971fca5e7";
-  const referenceId = "57e03a3e-b016-46d8-8cdb-91ae70a51b0d";
+  const senderTag = "5aa0c01d-7c1b-44e4-9704-bb99b9cf0135";
+  const cardId = "4c0216d4-5e21-4daf-823f-8af6757312d7";
+  const referenceId = "637833cc-01cc-4f34-812a-3d1bc4254075";
 
   let user = await User.findOne({
     $or: [{ mobile }, { studentId }],

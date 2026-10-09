@@ -29,10 +29,10 @@ export const AccessViaProconnectPage: React.FC = () => {
     setDemoError(null);
     try {
       const res = await simulateSsoCode({
-        studentId: "APT-2026-00417",
-        name: "Rohan Verma",
-        mobile: "9306700469",
-        email: "rohan.verma@aptech.ac.in",
+        studentId: "APT-2026-89490",
+        name: "Amit Sunda",
+        mobile: "9834744826",
+        email: "amit.sunda14@example.com",
       }).unwrap();
 
       if (res?.data?.code) {

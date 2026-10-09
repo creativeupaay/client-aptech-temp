@@ -283,9 +283,19 @@ export class HttpTransbankProvider implements ITransbankProvider {
 
   /**
    * Exchanges client credentials for a short-lived OAuth2 Bearer token (clientToken)
-   * used by @oxymoney/cardsdk-web. Caches token in memory based on returned expires_in.
+   * used by @oxymoney/cardsdk-web, or returns pre-shared static partner token.
    */
   public async getClientToken(): Promise<string> {
+    // If pre-shared partner token is configured in OXYMONEY_CLIENT_TOKEN, use it directly
+    if (process.env.OXYMONEY_CLIENT_TOKEN && process.env.OXYMONEY_CLIENT_TOKEN.length > 20) {
+      return process.env.OXYMONEY_CLIENT_TOKEN;
+    }
+
+    // If clientPassword is a 44-character base64 token from Appnit/OxyMoney, use directly
+    if (this.clientPassword && this.clientPassword.length > 20 && !this.clientPassword.includes("-")) {
+      return this.clientPassword;
+    }
+
     if (this.cachedClientToken && Date.now() < this.cachedClientToken.expiresAt) {
       return this.cachedClientToken.token;
     }
@@ -312,8 +322,7 @@ export class HttpTransbankProvider implements ITransbankProvider {
       if (!response.ok) {
         const errText = await response.text();
         console.error(`[TransbankProvider] Failed OAuth token response (HTTP ${response.status}):`, errText);
-        // Fallback to clientPassword if authserver fails
-        return this.clientPassword;
+        return process.env.OXYMONEY_CLIENT_TOKEN || this.clientPassword;
       }
 
       const data = (await response.json()) as { access_token: string; expires_in?: number };

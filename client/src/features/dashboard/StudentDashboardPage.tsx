@@ -43,7 +43,11 @@ export const StudentDashboardPage: React.FC = () => {
   const [isLaunching, setIsLaunching] = useState(false);
   const [showKycSuccessModal, setShowKycSuccessModal] = useState(false);
 
-  const { data: cardRes, isLoading: isCardLoading } = useGetCardQuery();
+  const {
+    data: cardRes,
+    isLoading: isCardLoading,
+    refetch: refetchCard,
+  } = useGetCardQuery();
   const {
     data: transactionsRes,
     refetch: refetchCardTransactions,
@@ -303,6 +307,7 @@ export const StudentDashboardPage: React.FC = () => {
               expiry="••/••"
               cvv="•••"
               onViewDetails={liveCard?.status === "NOT_APPLIED" ? () => navigate("/card/issuance") : undefined}
+              onRefreshCard={refetchCard}
             />
 
             {/* Balances, Limits & Load Money */}
@@ -343,6 +348,7 @@ export const StudentDashboardPage: React.FC = () => {
               <CardControls
                 maskedPan={liveCard?.maskedPan || undefined}
                 holderName={user.name}
+                onRefreshCard={refetchCard}
               />
             </div>
           </div>

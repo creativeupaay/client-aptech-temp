@@ -485,17 +485,24 @@ export class CardService {
 
     const studentUser = await User.findById(objectId);
     const transbank = TransbankFactory.getProvider();
-    const clientToken = await transbank.getClientToken();
+    const rawClientToken = await transbank.getClientToken();
+    const effectiveToken =
+      !rawClientToken || rawClientToken.startsWith("mock_")
+        ? (process.env.OXYMONEY_CLIENT_TOKEN || process.env.TRANSBNK_CLIENT_PASSWORD || "U7+a4uyR+msFcVv9G6cBMc7NypJnjIYXMGHLJLVKJgE=")
+        : rawClientToken;
+
+    const rawMobile = studentUser?.mobile || "8949006288";
+    const cleanMobile = rawMobile.replace(/\D/g, "").slice(-10) || "8949006288";
 
     return {
       cardId: card.cardId,
       senderTag: card.senderTag,
       maskedPan: card.maskedPan || "•••• •••• •••• 8942",
       holderName: studentUser?.name || "Cardholder",
-      clientId: env.TRANSBNK_CLIENT_ID || "EXTCLT000454",
-      clientToken,
-      mobileNumber: studentUser?.mobile || "",
-      sdkUrl: "https://cardsdk.oxymoney.com/v3",
+      clientId: process.env.OXYMONEY_CLIENT_ID || env.TRANSBNK_CLIENT_ID || "SENEXTCLT000454",
+      clientToken: effectiveToken,
+      mobileNumber: cleanMobile,
+      sdkUrl: "https://carduat.oxymoney.com",
       sdkSessionToken: `sdk_sess_${randomUUID()}`,
       environment: env.NODE_ENV === "production" ? "production" : "sandbox",
     };
