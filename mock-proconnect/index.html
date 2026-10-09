@@ -293,8 +293,8 @@
           <span class="text-[11px] font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 font-bold">Mock Config</span>
         </div>
 
-        <!-- 5 Persona Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+        <!-- 6 Persona Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
           <button type="button" onclick="setPersona(0)" id="pCard0"
             class="text-left p-3.5 rounded-2xl border-2 border-[#D85A14] bg-orange-50/50 transition cursor-pointer flex flex-col justify-between">
             <div>
@@ -348,6 +348,16 @@
               <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-01554</p>
             </div>
             <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 9123456789</span>
+          </button>
+
+          <button type="button" onclick="setPersona(5)" id="pCard5"
+            class="text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between">
+            <div>
+              <span class="text-[10px] font-bold text-teal-600 uppercase tracking-wider block mb-1">Aptech Student</span>
+              <p class="font-bold text-xs text-gray-900">Sourabh</p>
+              <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-SOURABH</p>
+            </div>
+            <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 9352008792</span>
           </button>
         </div>
 
@@ -448,6 +458,15 @@
         initials: "SP",
         program: "Hardware & Networking (Aptech N-Power)",
         center: "Ahmedabad Navrangpura (GJ-02)"
+      },
+      {
+        studentId: "APT-2026-SOURABH",
+        name: "Sourabh",
+        mobile: "9352008792",
+        email: "Sourabh@creativeupaay.com",
+        initials: "SO",
+        program: "Full Stack Software Engineering",
+        center: "Jaipur Center (RJ-01)"
       }
     ];
 

@@ -158,16 +158,20 @@ export class AuthService {
       throw ApiError.badRequest("Invalid student mobile number received from ProConnect.");
     }
 
-    // Step 1: Look for existing student by studentId, mobile, or email (priority to studentId)
+    // Step 1: Authoritative Account Lookup: Match strictly by verified studentId or verified mobile
     let user = await User.findOne({ studentId: studentProfile.studentId });
     if (!user) {
       user = await User.findOne({ mobile: sanitizedMobile });
     }
-    if (!user && studentProfile.email) {
-      user = await User.findOne({ email: studentProfile.email.toLowerCase().trim() });
-    }
 
     if (user) {
+      // Security Check: If found by mobile but already bound to another studentId, prevent takeover
+      if (user.studentId && user.studentId !== studentProfile.studentId) {
+        throw ApiError.conflict(
+          `This mobile number is already registered to a different student ID '${user.studentId}'.`
+        );
+      }
+
       // Step 2a: Automatic Account Linking
       // Ensure studentId and verified contact details are in sync with ProConnect
       user.studentId = studentProfile.studentId;
@@ -238,6 +242,9 @@ export class AuthService {
    * Generates a mock ProConnect SSO authorization code for local development and testing.
    */
   public static async simulateProconnectCode(profile?: Partial<ProconnectStudentProfile>) {
+    if (env.NODE_ENV === "production" || process.env.NODE_ENV === "production") {
+      throw ApiError.forbidden("Simulate code is disabled in production.");
+    }
     const provider = ProconnectFactory.getProvider();
     if (!provider.generateMockCode) {
       throw ApiError.badRequest("Simulate code is only available when using mock ProConnect provider.");

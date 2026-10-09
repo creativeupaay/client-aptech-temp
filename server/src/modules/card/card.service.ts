@@ -331,6 +331,10 @@ export class CardService {
     userId: Types.ObjectId | string,
     input: CompleteFullKycInput
   ): Promise<ICardDocument> {
+    if (input.isMock && (env.NODE_ENV === "production" || process.env.NODE_ENV === "production")) {
+      throw ApiError.forbidden("Mock KYC completion is disabled in production.");
+    }
+
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
@@ -372,6 +376,9 @@ export class CardService {
   public static async mockCompleteFullKyc(
     userId: Types.ObjectId | string
   ): Promise<ICardDocument> {
+    if (env.NODE_ENV === "production" || process.env.NODE_ENV === "production") {
+      throw ApiError.forbidden("Mock KYC completion is disabled in production.");
+    }
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
@@ -484,22 +491,29 @@ export class CardService {
     }
 
     const studentUser = await User.findById(objectId);
+    if (!studentUser) {
+      throw ApiError.notFound("Student user profile not found.");
+    }
+
+    const rawMobile = studentUser.mobile || "";
+    const cleanMobile = rawMobile.replace(/\D/g, "").slice(-10);
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      throw ApiError.badRequest("Valid 10-digit mobile number is required for Card SDK session.");
+    }
+
     const transbank = TransbankFactory.getProvider();
     const rawClientToken = await transbank.getClientToken();
     const effectiveToken =
       !rawClientToken || rawClientToken.startsWith("mock_")
-        ? (process.env.OXYMONEY_CLIENT_TOKEN || process.env.TRANSBNK_CLIENT_PASSWORD || "U7+a4uyR+msFcVv9G6cBMc7NypJnjIYXMGHLJLVKJgE=")
+        ? (env.OXYMONEY_CLIENT_TOKEN || env.TRANSBNK_CLIENT_PASSWORD || "")
         : rawClientToken;
-
-    const rawMobile = studentUser?.mobile || "8949006288";
-    const cleanMobile = rawMobile.replace(/\D/g, "").slice(-10) || "8949006288";
 
     return {
       cardId: card.cardId,
       senderTag: card.senderTag,
       maskedPan: card.maskedPan || "•••• •••• •••• 8942",
-      holderName: studentUser?.name || "Cardholder",
-      clientId: process.env.OXYMONEY_CLIENT_ID || env.TRANSBNK_CLIENT_ID || "SENEXTCLT000454",
+      holderName: studentUser.name || "Cardholder",
+      clientId: env.OXYMONEY_CLIENT_ID || env.TRANSBNK_CLIENT_ID,
       clientToken: effectiveToken,
       mobileNumber: cleanMobile,
       sdkUrl: "https://carduat.oxymoney.com",
@@ -535,8 +549,6 @@ export class CardService {
         "Active card ID is missing. Please poll card status or contact support."
       );
     }
-
-
 
     if (card.availableBalance + input.amount > card.totalLimit) {
       throw ApiError.badRequest(
@@ -596,10 +608,34 @@ export class CardService {
       throw err;
     }
 
+    // 3. Atomically pre-reserve balance to prevent race conditions and ensure limit is respected before calling bank
+    const reservedCard = await Card.findOneAndUpdate(
+      {
+        _id: card._id,
+        $expr: {
+          $lte: [{ $add: ["$availableBalance", input.amount] }, "$totalLimit"],
+        },
+      },
+      {
+        $inc: { availableBalance: input.amount },
+      },
+      { returnDocument: "after" }
+    );
+
+    if (!reservedCard) {
+      pendingTx.status = "FAILED";
+      await pendingTx.save();
+      throw ApiError.badRequest(
+        `Total balance cannot exceed current card limit of ₹${card.totalLimit.toLocaleString(
+          "en-IN"
+        )}. Complete Full KYC to unlock limits up to ₹2,00,000.`
+      );
+    }
+
     const transbank = TransbankFactory.getProvider();
     const formattedAmount = input.amount.toFixed(2);
 
-    // 3. Call API 6: GPR Card Load
+    // 4. Call API 6: GPR Card Load
     let loadResult: { referenceId: number };
     try {
       loadResult = await transbank.loadGprCard({
@@ -609,12 +645,16 @@ export class CardService {
       pendingTx.loadReferenceId = String(loadResult.referenceId);
       await pendingTx.save();
     } catch (loadErr) {
+      // Roll back pre-reserved balance on load failure
+      await Card.findByIdAndUpdate(card._id, {
+        $inc: { availableBalance: -input.amount },
+      });
       pendingTx.status = "FAILED";
       await pendingTx.save();
       throw loadErr;
     }
 
-    // 4. Call API 7: Load Money Status (with retry loop for SUBMITTED state)
+    // 5. Call API 7: Load Money Status (with retry loop for SUBMITTED state)
     let statusResult = await transbank.getLoadMoneyStatus({
       referenceId: String(loadResult.referenceId),
     });
@@ -631,8 +671,12 @@ export class CardService {
       });
     }
 
-    // 5. Assert banking gateway status
+    // 6. Assert banking gateway status
     if (statusResult.status !== "SUCCESS") {
+      // Roll back pre-reserved balance if bank load did not succeed
+      await Card.findByIdAndUpdate(card._id, {
+        $inc: { availableBalance: -input.amount },
+      });
       pendingTx.status = statusResult.status === "FAILED" ? "FAILED" : "PENDING";
       await pendingTx.save();
       throw ApiError.badRequest(
@@ -640,33 +684,13 @@ export class CardService {
       );
     }
 
-    // 6. Atomic balance update
-    const updatedCard = await Card.findOneAndUpdate(
-      {
-        _id: card._id,
-        $expr: {
-          $lte: [{ $add: ["$availableBalance", input.amount] }, "$totalLimit"],
-        },
-      },
-      {
-        $inc: { availableBalance: input.amount },
-      },
-      { returnDocument: "after" }
-    );
-
-    if (!updatedCard) {
-      throw ApiError.badRequest(
-        "Unable to credit funds: total balance exceeds card limit."
-      );
-    }
-
     // 7. Finalize ledger record
     pendingTx.txnId = statusResult.txnId || `TXN${Date.now()}`;
     pendingTx.status = "SUCCESS";
-    pendingTx.balanceAfter = updatedCard.availableBalance;
+    pendingTx.balanceAfter = reservedCard.availableBalance;
     await pendingTx.save();
 
-    return { transaction: pendingTx, card: updatedCard };
+    return { transaction: pendingTx, card: reservedCard };
     }, { ttlMs: 8000 });
   }
 

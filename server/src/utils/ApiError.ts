@@ -50,6 +50,10 @@ export class ApiError extends Error {
     return new ApiError(504, message);
   }
 
+  static serviceUnavailable(message = "Service Unavailable"): ApiError {
+    return new ApiError(503, message);
+  }
+
   static internal(message = "Internal Server Error"): ApiError {
     return new ApiError(500, message, undefined, false);
   }

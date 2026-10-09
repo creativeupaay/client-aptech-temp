@@ -352,14 +352,22 @@ export class HubbleService {
     const actualRefundAmount = existingDebit.amount || (refundAmount > 0 ? refundAmount : 1);
 
     // Two-Phase State Pattern: Transition to REVERSAL_PENDING first to guard concurrent duplicates
+    // Recovers abandoned/crashed locks older than 30 seconds
+    const REVERSAL_LEASE_MS = 30000;
+    const staleThreshold = new Date(Date.now() - REVERSAL_LEASE_MS);
+
     const lockedDebit = await DebitTransaction.findOneAndUpdate(
       {
         _id: existingDebit._id,
-        status: "DEBITED",
+        $or: [
+          { status: "DEBITED" },
+          { status: "REVERSAL_PENDING", updatedAt: { $lt: staleThreshold } },
+        ],
       },
       {
         $set: {
           status: "REVERSAL_PENDING",
+          updatedAt: new Date(),
         },
       },
       { returnDocument: "after" }
@@ -476,16 +484,23 @@ export class HubbleService {
       data.partnerCoinTransactionId ||
       undefined;
 
-    const rawStatus = (data.status || data.orderStatus || "ACTIVE").toUpperCase();
-    let normalizedStatus: VoucherStatus = "ACTIVE";
-    if (rawStatus === "FAILED" || rawStatus === "CANCELLED") {
+    const rawStatus = (data.status || data.orderStatus || "PENDING").toUpperCase();
+    let normalizedStatus: VoucherStatus = "PENDING";
+    if (rawStatus === "FAILED" || rawStatus === "CANCELLED" || rawStatus === "REJECTED") {
       normalizedStatus = "FAILED";
-    } else if (rawStatus === "USED") {
+    } else if (rawStatus === "USED" || rawStatus === "REDEEMED") {
       normalizedStatus = "USED";
     } else if (rawStatus === "EXPIRED") {
       normalizedStatus = "EXPIRED";
-    } else {
+    } else if (
+      rawStatus === "ACTIVE" ||
+      rawStatus === "SUCCESS" ||
+      rawStatus === "COMPLETED" ||
+      rawStatus === "FULFILLED"
+    ) {
       normalizedStatus = "ACTIVE";
+    } else {
+      normalizedStatus = "PENDING";
     }
 
     // Auto-reversal handling: if voucher redemption failed/cancelled on Hubble, restore student's coins
@@ -496,6 +511,7 @@ export class HubbleService {
           { referenceId: orderId },
           ...(transactionId ? [{ transactionId }] : []),
         ],
+        userId: user._id,
         status: "DEBITED",
       });
 

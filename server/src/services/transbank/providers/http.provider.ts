@@ -322,7 +322,12 @@ export class HttpTransbankProvider implements ITransbankProvider {
       if (!response.ok) {
         const errText = await response.text();
         console.error(`[TransbankProvider] Failed OAuth token response (HTTP ${response.status}):`, errText);
-        return process.env.OXYMONEY_CLIENT_TOKEN || this.clientPassword;
+        if (process.env.OXYMONEY_CLIENT_TOKEN) {
+          return process.env.OXYMONEY_CLIENT_TOKEN;
+        }
+        throw ApiError.serviceUnavailable(
+          "Failed to acquire client token from Card Gateway OAuth provider."
+        );
       }
 
       const data = (await response.json()) as { access_token: string; expires_in?: number };
@@ -336,8 +341,14 @@ export class HttpTransbankProvider implements ITransbankProvider {
 
       return data.access_token;
     } catch (err: any) {
+      if (err instanceof ApiError) throw err;
       console.error("[TransbankProvider] getClientToken network error:", err.message);
-      return this.clientPassword;
+      if (process.env.OXYMONEY_CLIENT_TOKEN) {
+        return process.env.OXYMONEY_CLIENT_TOKEN;
+      }
+      throw ApiError.serviceUnavailable(
+        "Card Gateway OAuth provider is temporarily unreachable."
+      );
     }
   }
 }

@@ -12,10 +12,11 @@
  */
 
 import jwt from "jsonwebtoken";
+import { env } from "../src/env.config.js";
 
 const API_BASE = process.env.TEST_API_URL || "http://localhost:8000/api/v1/hubble";
-const HUBBLE_SECRET = process.env.HUBBLE_WEBHOOK_SECRET || "mock_hubble_secret_2026";
-const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "tbx_access_secret_key_super_secure_2026";
+const HUBBLE_SECRET = env.HUBBLE_WEBHOOK_SECRET;
+const JWT_SECRET = env.JWT_ACCESS_SECRET;
 
 interface TestResponse<T = Record<string, unknown>> {
   success: boolean;

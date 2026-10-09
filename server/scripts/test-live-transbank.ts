@@ -1,12 +1,13 @@
 import { HttpTransbankProvider } from "../src/services/transbank/providers/http.provider.js";
+import { env } from "../src/env.config.js";
 
 async function main() {
   const provider = new HttpTransbankProvider({
-    baseUrl: "https://sandbox-api.trusthub.in",
-    apiKey: "aEbRWf9z1F56N8LrnxEuu9MZ5sQknleCmQHSlHlj",
-    clientId: "EXTCLT000454",
-    username: "9306700469",
-    clientPassword: "035950b0-dcaf-4f84-99be-1a23773f5e40",
+    baseUrl: env.TRANSBNK_BASE_URL,
+    apiKey: env.TRANSBNK_API_KEY,
+    clientId: env.TRANSBNK_CLIENT_ID,
+    username: env.TRANSBNK_USERNAME,
+    clientPassword: env.TRANSBNK_CLIENT_PASSWORD,
   });
 
   console.log("--------------------------------------------------");

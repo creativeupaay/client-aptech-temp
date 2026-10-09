@@ -9,8 +9,9 @@ export interface LaunchSdkOptions {
   onError?: (error: unknown) => void;
 }
 
-// Global reference to active SDK instance for global session clearing
+// Global reference to active SDK instance and mobile for secure in-memory session tracking
 let activeSdkInstance: CardSDK | null = null;
+let activeSdkMobile: string | null = null;
 
 export const clearCardSdkSession = () => {
   if (activeSdkInstance) {
@@ -21,7 +22,8 @@ export const clearCardSdkSession = () => {
     }
     activeSdkInstance = null;
   }
-  // Clear any remaining sessionStorage items set by CardSDK
+  activeSdkMobile = null;
+  // Purge any storage keys left by third-party CardSDK iframe
   try {
     sessionStorage.removeItem("cardsdk_session_token");
     sessionStorage.removeItem("OXYMONEY_TOKEN");
@@ -162,11 +164,11 @@ export const useCardSdk = () => {
           throw new Error("Card SDK session credentials not available.");
         }
 
-        // If the mobile number in session storage does not match current session, reset SDK session
-        const currentSavedMobile = sessionStorage.getItem("OXYMONEY_USER_NUMBER");
-        if (currentSavedMobile && currentSavedMobile !== session.mobileNumber) {
+        // Verify in-memory mobile state rather than reading from unencrypted sessionStorage
+        if (activeSdkMobile && activeSdkMobile !== session.mobileNumber) {
           clearCardSdkSession();
         }
+        activeSdkMobile = session.mobileNumber;
 
         const effectiveCardId = options?.cardId || session.cardId || undefined;
 

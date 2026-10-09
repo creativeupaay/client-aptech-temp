@@ -55,6 +55,10 @@ app.use(
       "x-hubble-secret",
       "X-HubbleSecret",
       "x-hubblesecret",
+      "X-Verify",
+      "x-verify",
+      "X-Hubble-Signature",
+      "x-hubble-signature",
       "X-TBX-Client-Id",
       "X-TBX-Client-Secret",
     ],
@@ -63,7 +67,14 @@ app.use(
 
 // Body and Cookie parsers
 app.use(cookieParser());
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 

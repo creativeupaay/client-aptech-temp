@@ -9,6 +9,7 @@ import {
   registerAndIssueCardSchema,
   sendCardOtpSchema,
 } from "./card.validation.js";
+import { env } from "../../env.config.js";
 
 const router = Router();
 
@@ -50,12 +51,14 @@ router.post(
   CardController.completeFullKyc
 );
 
-// Mock Full KYC Verification & Upgrade for dev/demo
-router.post(
-  "/mock-complete-kyc",
-  authenticate,
-  CardController.mockCompleteFullKyc
-);
+// Mock Full KYC Verification & Upgrade for dev/demo only
+if (env.NODE_ENV !== "production") {
+  router.post(
+    "/mock-complete-kyc",
+    authenticate,
+    CardController.mockCompleteFullKyc
+  );
+}
 
 // Asynchronous Card Creation Status Polling (API 5)
 router.get("/poll-status", authenticate, CardController.pollCardStatus);

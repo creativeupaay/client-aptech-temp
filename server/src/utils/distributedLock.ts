@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getRedisClient, isRedisConnected } from "../config/redis.js";
 import { ApiError } from "./ApiError.js";
+import { env } from "../env.config.js";
 
 /**
  * Lua script that atomically verifies ownership before releasing the lock.
@@ -36,8 +37,14 @@ export async function withDistributedLock<T>(
   const ttlMs = options.ttlMs ?? 5000;
   const redis = getRedisClient();
 
-  // If Redis is not available, execute directly (graceful fallback)
+  // If Redis is not available, fail-closed in production to preserve concurrency integrity
   if (!redis || !isRedisConnected()) {
+    const isProduction = env.NODE_ENV === "production" || process.env.NODE_ENV === "production";
+    if (isProduction) {
+      throw ApiError.serviceUnavailable(
+        "Distributed lock provider is temporarily unavailable. Transaction aborted to prevent concurrency conflicts."
+      );
+    }
     return await task();
   }
 
@@ -49,9 +56,13 @@ export async function withDistributedLock<T>(
     const res = await redis.set(key, lockToken, "PX", ttlMs, "NX");
     acquired = res === "OK";
   } catch (err) {
-    // If Redis error occurs during acquisition, allow task to continue with warning
-    console.warn(`⚠️ [REDIS LOCK] Error checking lock for ${key}:`, err);
-    return await task();
+    if (process.env.NODE_ENV === "test") {
+      console.warn(`⚠️ [REDIS LOCK] Error checking lock for ${key}:`, err);
+      return await task();
+    }
+    throw ApiError.serviceUnavailable(
+      "Unable to acquire transaction lock. Please retry."
+    );
   }
 
   if (!acquired) {

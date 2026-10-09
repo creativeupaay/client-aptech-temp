@@ -5,12 +5,23 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 12 bytes recommended for GCM
 const PREFIX = "enc:v1:";
 
+const HKDF_SALT = "aptech_vault_salt_v1";
+const HKDF_INFO = "aptech_aes_gcm_field_encryption";
+
 /**
- * Derives a 32-byte key from the configured secret.
+ * Derives a cryptographically strong 32-byte key using HKDF-SHA256.
  */
 function getEncryptionKey(): Buffer {
   const secret = env.ENCRYPTION_KEY || env.JWT_ACCESS_SECRET;
-  return crypto.createHash("sha256").update(secret).digest();
+  return Buffer.from(
+    crypto.hkdfSync(
+      "sha256",
+      Buffer.from(secret),
+      Buffer.from(HKDF_SALT),
+      Buffer.from(HKDF_INFO),
+      32
+    )
+  );
 }
 
 /**

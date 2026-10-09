@@ -213,6 +213,15 @@ export const completeFullKycSchema = z
     isMock: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
+    if (process.env.NODE_ENV === "production" && data.isMock) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Mock KYC verification is strictly disabled in production.",
+        path: ["isMock"],
+      });
+      return;
+    }
+
     if (!data.isMock) {
       if (!data.aadhaarNumber || !/^[0-9]{12}$/.test(data.aadhaarNumber)) {
         ctx.addIssue({

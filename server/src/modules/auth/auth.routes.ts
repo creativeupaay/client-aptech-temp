@@ -11,6 +11,7 @@ import {
   ssoSimulateLimiter,
   ssoExchangeLimiter,
 } from "../../middlewares/rateLimiter.middleware.js";
+import { env } from "../../env.config.js";
 
 const router = Router();
 
@@ -20,7 +21,9 @@ router.post("/logout", AuthController.logout);
 
 // Aptech ProConnect SSO endpoints
 router.post("/sso/exchange", ssoExchangeLimiter, validateRequest({ body: ssoExchangeSchema }), AuthController.ssoExchange);
-router.post("/sso/simulate-code", ssoSimulateLimiter, validateRequest({ body: simulateSsoCodeSchema }), AuthController.simulateSsoCode);
+if (env.NODE_ENV !== "production") {
+  router.post("/sso/simulate-code", ssoSimulateLimiter, validateRequest({ body: simulateSsoCodeSchema }), AuthController.simulateSsoCode);
+}
 
 // Authenticated student profile endpoint
 router.get("/me", authenticate, AuthController.getMe);

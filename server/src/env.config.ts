@@ -110,6 +110,14 @@ const envSchema = z.object({
   TRANSBNK_PROVIDER: z
     .enum(["mock", "http"])
     .default((process.env.TRANSBNK_PROVIDER as "mock" | "http") || "mock"),
+  OXYMONEY_CLIENT_ID: z
+    .string()
+    .min(1)
+    .default(process.env.OXYMONEY_CLIENT_ID || "SENEXTCLT000454"),
+  OXYMONEY_CLIENT_TOKEN: z
+    .string()
+    .min(1)
+    .default(process.env.OXYMONEY_CLIENT_TOKEN || "mock_oxymoney_client_token"),
 }).superRefine((data, ctx) => {
   if (data.NODE_ENV === "production" && data.TRANSBNK_PROVIDER === "http") {
     if (data.TRANSBNK_API_KEY === "sandbox_api_key") {

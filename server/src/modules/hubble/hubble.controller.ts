@@ -8,7 +8,7 @@ import { ApiError } from "../../utils/ApiError.js";
 
 export class HubbleController {
   /**
-   * Helper to verify X-Hubble-Secret header using constant-time comparison.
+   * Helper to verify Hubble authentication via X-Hubble-Secret or HMAC-SHA256 signature.
    * Protects against timing attacks and enforces authentication unconditionally.
    */
   private static verifyHubbleSecret(req: Request) {
@@ -17,11 +17,16 @@ export class HubbleController {
       return;
     }
 
+    const secret = env.HUBBLE_WEBHOOK_SECRET?.trim();
+    if (!secret) {
+      throw ApiError.internal("Hubble webhook secret is not configured.");
+    }
+
     const incomingSecret =
       ((req.headers["x-hubble-secret"] as string) || (req.headers["x-hubblesecret"] as string))?.trim();
 
     if (incomingSecret) {
-      const validSecrets = [env.HUBBLE_WEBHOOK_SECRET.trim()];
+      const validSecrets = [secret];
       if (env.HUBBLE_APP_SECRET?.trim()) {
         validSecrets.push(env.HUBBLE_APP_SECRET.trim());
       }
@@ -39,11 +44,33 @@ export class HubbleController {
       return;
     }
 
-    // For webhooks from Hubble Cloud: authenticated via X-Verify or X-Webhook-Id header
-    const xVerify = req.headers["x-verify"] as string;
-    const xWebhookId = req.headers["x-webhook-id"] as string;
-    if (xVerify || xWebhookId) {
-      return;
+    // For webhooks from Hubble Cloud: verify HMAC-SHA256 signature in X-Verify or X-Hubble-Signature
+    const incomingSignature = (
+      (req.headers["x-verify"] as string) ||
+      (req.headers["x-hubble-signature"] as string)
+    )?.trim();
+
+    if (incomingSignature) {
+      const rawBuffer = (req as Request & { rawBody?: Buffer }).rawBody;
+      const payloadToVerify =
+        rawBuffer && rawBuffer.length > 0
+          ? rawBuffer
+          : Buffer.from(JSON.stringify(req.body));
+      const computedSignature = crypto
+        .createHmac("sha256", secret)
+        .update(payloadToVerify)
+        .digest("hex");
+
+      const incomingBuffer = Buffer.from(incomingSignature);
+      const computedBuffer = Buffer.from(computedSignature);
+
+      if (
+        incomingBuffer.length === computedBuffer.length &&
+        crypto.timingSafeEqual(incomingBuffer, computedBuffer)
+      ) {
+        return;
+      }
+      throw ApiError.unauthorized("Invalid HMAC signature in X-Verify header.");
     }
 
     throw ApiError.unauthorized("Missing authorization header (X-Hubble-Secret or X-Verify).");
