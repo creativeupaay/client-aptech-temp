@@ -650,7 +650,7 @@
       btnSpinner.classList.remove("hidden");
 
       try {
-        const response = await fetch("http://localhost:8000/api/v1/auth/sso/simulate-code", {
+        const response = await fetch("https://api-apitech-uat.creativeupaay.com/api/v1/auth/sso/simulate-code", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
