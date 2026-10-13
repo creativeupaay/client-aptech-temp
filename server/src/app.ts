@@ -27,6 +27,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5175",
   "https://sdk.dev.myhubble.money",
   "https://dev.myhubble.money",
+  "https://aptech-proconnect-mock.creativeupaay.com/"
 ];
 
 // Cross-Origin Resource Sharing
