@@ -1,3 +1,3 @@
 # GitHub Packages registry configuration for @oxymoney scope
 @oxymoney:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=_____
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
