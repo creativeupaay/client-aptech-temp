@@ -3,6 +3,7 @@ import { ApiError } from "../../../utils/ApiError.js";
 import type {
   IProconnectService,
   ProconnectCardSyncInput,
+  ProconnectRedemptionSyncInput,
   ProconnectStudentProfile,
 } from "../proconnect.interface.js";
 
@@ -92,8 +93,23 @@ export class MockProconnectProvider implements IProconnectService {
       console.log(`  Student ID:     ${input.studentId}`);
       console.log(`  Mobile:         ${input.mobileNumber}`);
       console.log(`  Card Status:    ${input.cardStatus}`);
+      console.log(`  Card ID:        ${input.cardId || "N/A"}`);
       console.log(`  Last 4 Digits:  ${input.last4Digits || "N/A"}`);
       console.log(`  Timestamp:      ${input.timestamp || new Date().toISOString()}`);
+      console.log(`=================================================\n`);
+    }
+  }
+
+  public async syncRedemption(input: ProconnectRedemptionSyncInput): Promise<void> {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`\n=================================================`);
+      console.log(`[PROCONNECT REDEMPTION SYNC] Voucher redemption synced:`);
+      console.log(`  Student ID:         ${input.studentId}`);
+      console.log(`  Order ID:           ${input.orderId}`);
+      console.log(`  Points Spent:       ${input.pointsSpent}`);
+      console.log(`  Remaining Balance:  ${input.remainingBalance}`);
+      console.log(`  Voucher:            ${input.voucherName || "N/A"}`);
+      console.log(`  Timestamp:          ${input.timestamp || new Date().toISOString()}`);
       console.log(`=================================================\n`);
     }
   }

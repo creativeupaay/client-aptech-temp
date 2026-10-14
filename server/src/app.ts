@@ -14,10 +14,49 @@ const app: Application = express();
 // Enable trust proxy for ngrok, reverse proxies, and load balancers
 app.set("trust proxy", 1);
 
-// Security HTTP headers (allow Swagger UI inline styles and scripts)
+// Security HTTP headers + CSP allowlist for Oxymoney CardSDK / Hubble (DSH-17)
+// Swagger UI needs unsafe-inline for styles/scripts on /api-docs only — keep CSP
+// slightly permissive for script-src/style-src while locking frame/connect hosts.
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: [
+          "'self'",
+          "https://carduat.oxymoney.com",
+          "https://partners.oxymoney.com",
+          "https://gcdev.oxymoney.com",
+          "https://sandbox-api.trusthub.in",
+          "https://sdk.dev.myhubble.money",
+          "https://dev.myhubble.money",
+          "https://myhubble.money",
+          "https://*.myhubble.money",
+          env.CLIENT_URL,
+        ].filter(Boolean) as string[],
+        frameSrc: [
+          "'self'",
+          "https://carduat.oxymoney.com",
+          "https://partners.oxymoney.com",
+          "https://gcdev.oxymoney.com",
+          "https://sdk.dev.myhubble.money",
+          "https://dev.myhubble.money",
+          "https://myhubble.money",
+          "https://*.myhubble.money",
+        ],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        ...(env.NODE_ENV === "production"
+          ? { upgradeInsecureRequests: [] as string[] }
+          : {}),
+      },
+    },
   })
 );
 

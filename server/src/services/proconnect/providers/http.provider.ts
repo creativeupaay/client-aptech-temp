@@ -71,9 +71,30 @@ export class HttpProconnectProvider implements IProconnectService {
           "X-TBX-Client-Secret": env.PROCONNECT_CLIENT_SECRET,
         },
         body: JSON.stringify(input),
+        signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
       console.warn("[PROCONNECT] Card sync call failed, continuing gracefully:", err);
+    }
+  }
+
+  public async syncRedemption(
+    input: import("../proconnect.interface.js").ProconnectRedemptionSyncInput
+  ): Promise<void> {
+    const endpoint = `${env.PROCONNECT_API_URL.replace(/\/+$/, "")}/redemptions/sync`;
+    try {
+      await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-TBX-Client-Id": env.PROCONNECT_CLIENT_ID,
+          "X-TBX-Client-Secret": env.PROCONNECT_CLIENT_SECRET,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (err) {
+      console.warn("[PROCONNECT] Redemption sync call failed, continuing gracefully:", err);
     }
   }
 }

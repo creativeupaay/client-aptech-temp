@@ -214,7 +214,8 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.card.status).toBe("ACTIVE");
-      expect(res.body.data.card.senderTag).toBeDefined();
+      // senderTag must never be exposed to API clients (encrypted at rest)
+      expect(res.body.data.card.senderTag).toBeUndefined();
       expect(res.body.data.card.cardId).toBeDefined();
       expect(res.body.data.card.referenceId).toBeDefined();
       expect(res.body.data.card.maskedPan).toBe("•••• •••• •••• 8942");
@@ -229,6 +230,8 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
       expect(savedCard).not.toBeNull();
       expect(savedCard?.status).toBe("ACTIVE");
       expect(savedCard?.cardId).toBe(res.body.data.card.cardId);
+      expect(savedCard?.senderTag).toBeTruthy();
+      expect(savedCard?.senderTag?.startsWith("enc:v1:")).toBe(true);
       expect(savedCard?.maskedPan).toBe("•••• •••• •••• 8942");
       expect((savedCard as unknown as Record<string, unknown>).cardNumber).toBeUndefined();
       expect((savedCard as unknown as Record<string, unknown>).expiry).toBeUndefined();
@@ -414,7 +417,7 @@ describe("TransBnk Card Issuance & KYC Integration", () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.cardId).toBeDefined();
-      expect(res.body.data.senderTag).toBeDefined();
+      expect(res.body.data.senderTag).toBeUndefined();
       expect(res.body.data.sdkSessionToken).toBeDefined();
       expect(res.body.data.maskedPan).toBeDefined();
     });

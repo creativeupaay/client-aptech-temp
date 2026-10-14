@@ -1,4 +1,8 @@
 import { ApiError } from "../../../utils/ApiError.js";
+import {
+  mapGatewayHttpError,
+  throwTransbankStatusError,
+} from "../transbankErrorMap.js";
 import type {
   ITransbankProvider,
   TransbankCardCreateInput,
@@ -78,9 +82,20 @@ export class HttpTransbankProvider implements ITransbankProvider {
     };
   }
 
+  private resolveOperation(
+    path: string
+  ): "load" | "otp" | "register" | "card" | "generic" {
+    if (path.includes("gpr-load") || path.includes("load-money")) return "load";
+    if (path.includes("customer-otp")) return "otp";
+    if (path.includes("customer-register")) return "register";
+    if (path.includes("card-")) return "card";
+    return "generic";
+  }
+
   private async post<TReq, TRes>(path: string, payload: TReq): Promise<TRes> {
     const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const sanitizedPayload = this.sanitize(payload);
+    const operation = this.resolveOperation(path);
 
     try {
       const response = await fetch(url, {
@@ -104,40 +119,16 @@ export class HttpTransbankProvider implements ITransbankProvider {
       }
 
       if (!response.ok) {
-        if (response.status === 403) {
-          throw ApiError.forbidden(
-            json.message ||
-              "TransBnk access forbidden. Please verify API key and outbound IP whitelisting."
-          );
-        }
-        if (response.status === 400) {
-          throw ApiError.badRequest(json.message || "Invalid payload sent to TransBnk.");
-        }
-        throw ApiError.badGateway(
-          `TransBnk HTTP error: ${response.status} ${response.statusText}`
-        );
+        mapGatewayHttpError(response.status, json.message);
       }
 
       if (json.status && json.status.code !== 2000) {
-        // Status code 2020 signifies "Pending / In-Progress" on TransBnk (TransBnk API Spec Sec 6.2)
+        // Status code 2020 signifies "Pending / In-Progress" on TransBnk (API Spec Sec 6.2)
         if (json.status.code === 2020) {
           return (json.result !== undefined ? json.result : (json as unknown)) as TRes;
         }
 
-        const errorMsg = json.status.message || `TransBnk operation failed (Code: ${json.status.code})`;
-        if (json.status.code === 4165) {
-          throw ApiError.conflict("Mobile number is already registered on TransBnk.");
-        }
-        if (json.status.code === 4164) {
-          throw ApiError.badRequest("Document identifier is already registered to another user profile.");
-        }
-        if (json.status.code === 4162) {
-          throw ApiError.badRequest("Insufficient balance in merchant nodal account.");
-        }
-        if (json.status.code === 5000) {
-          throw ApiError.badRequest(errorMsg);
-        }
-        throw ApiError.badRequest(errorMsg);
+        throwTransbankStatusError(json.status.code, json.status.message, { operation });
       }
 
       return (json.result !== undefined ? json.result : (json as unknown)) as TRes;

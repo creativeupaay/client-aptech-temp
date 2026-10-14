@@ -5,13 +5,25 @@ export interface ProconnectStudentProfile {
   email: string;
 }
 
+export type ProconnectPortalCardStatus = "Issued" | "Not Issued" | "Pending" | "Rejected";
+
 export interface ProconnectCardSyncInput {
   studentId: string;
   mobileNumber: string;
   emailId: string;
-  cardStatus: "ACTIVE" | "APPLICATION_PENDING" | "REJECTED";
+  cardStatus: ProconnectPortalCardStatus;
+  cardId?: string;
   last4Digits?: string;
   merchantTransactionId?: string;
+  timestamp?: string;
+}
+
+export interface ProconnectRedemptionSyncInput {
+  studentId: string;
+  orderId: string;
+  pointsSpent: number;
+  remainingBalance: number;
+  voucherName?: string;
   timestamp?: string;
 }
 
@@ -27,6 +39,11 @@ export interface IProconnectService {
    * Mandated by Functional Spec Section 6 (TBX -> ProConnect).
    */
   syncCardIssuance(input: ProconnectCardSyncInput): Promise<void>;
+
+  /**
+   * Synchronizes voucher redemption outcome and remaining loyalty balance to ProConnect (RWD-08).
+   */
+  syncRedemption(input: ProconnectRedemptionSyncInput): Promise<void>;
 
   /**
    * Optional helper (primarily for mock/dev) to generate a simulated authorization code.

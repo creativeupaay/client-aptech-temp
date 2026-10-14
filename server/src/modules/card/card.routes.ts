@@ -2,7 +2,11 @@ import { Router } from "express";
 import { CardController } from "./card.controller.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validate.middleware.js";
-import { cardOtpIpLimiter, cardOtpLimiter } from "../../middlewares/rateLimiter.middleware.js";
+import {
+  cardIssueLimiter,
+  cardOtpIpLimiter,
+  cardOtpLimiter,
+} from "../../middlewares/rateLimiter.middleware.js";
 import {
   completeFullKycSchema,
   loadMoneySchema,
@@ -29,6 +33,7 @@ router.get("/me", authenticate, CardController.getCardDetails);
 router.post(
   "/register-and-issue",
   authenticate,
+  cardIssueLimiter,
   validateRequest({ body: registerAndIssueCardSchema }),
   CardController.registerAndIssue
 );

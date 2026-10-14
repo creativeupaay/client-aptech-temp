@@ -6,17 +6,78 @@ import { CardTransaction, type ICardTransactionDocument } from "./cardTransactio
 import { TransbankFactory } from "../../services/transbank/index.js";
 import { ProconnectFactory } from "../../services/proconnect/index.js";
 import { AptrackFactory } from "../../services/aptrack/index.js";
-import { User } from "../user/user.model.js";
+import { User, type IUserDocument } from "../user/user.model.js";
 import { env } from "../../env.config.js";
 import { withDistributedLock } from "../../utils/distributedLock.js";
 import { CacheService } from "../../utils/cache.js";
+import {
+  extractLast4,
+  toPortalCardStatus,
+} from "./cardStatusMapper.js";
+import { getSenderTagPlain, setSenderTagEncrypted } from "./senderTagCrypto.js";
 import type {
   CompleteFullKycInput,
   LoadMoneyInput,
   RegisterAndIssueCardInput,
 } from "./card.validation.js";
 
+const CARD_POLL_MAX_WAIT_MS = 120_000;
+const CARD_POLL_BASE_INTERVAL_MS = 2_000;
+const CARD_POLL_MAX_INTERVAL_MS = 8_000;
+const MIN_KYC_PER_LOAD_MAX = 10_000;
+const FULL_KYC_PER_LOAD_MAX = 200_000;
+
 export class CardService {
+  private static resolvePlainSenderTag(card: ICardDocument): string | null {
+    return getSenderTagPlain(card.senderTag);
+  }
+
+  private static async persistEncryptedSenderTag(
+    card: ICardDocument,
+    plainSenderTag: string
+  ): Promise<void> {
+    card.senderTag = setSenderTagEncrypted(plainSenderTag);
+    await card.save();
+  }
+
+  private static async syncIssuancePartners(
+    studentUser: IUserDocument | null,
+    card: ICardDocument
+  ): Promise<void> {
+    const last4 = extractLast4(card.maskedPan);
+    const portalStatus = toPortalCardStatus(card.status);
+
+    if (studentUser?.studentId) {
+      ProconnectFactory.getProvider()
+        .syncCardIssuance({
+          studentId: studentUser.studentId,
+          mobileNumber: studentUser.mobile,
+          emailId: studentUser.email,
+          cardStatus: portalStatus,
+          cardId: card.cardId || undefined,
+          last4Digits: last4,
+          merchantTransactionId: card.referenceId || undefined,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((err) => console.warn("[PROCONNECT] Student card sync error:", err));
+    } else if (studentUser) {
+      AptrackFactory.getProvider()
+        .syncLeadCardStatus({
+          mobile: studentUser.mobile,
+          cardStatus:
+            card.status === "REJECTED"
+              ? "REJECTED"
+              : card.status === "APPLICATION_PENDING"
+                ? "APPLICATION_PENDING"
+                : "ACTIVE",
+          last4Digits: last4,
+          cardId: card.cardId || undefined,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((err) => console.warn("[APTRACK] Lead card status sync error:", err));
+    }
+  }
+
   /**
    * Retrieves the current user's card.
    * If no card exists, initializes a default lean NOT_APPLIED card.
@@ -50,184 +111,179 @@ export class CardService {
 
   /**
    * Registers customer with TransBnk (API 2) and triggers virtual GPR card creation (API 4 + API 5).
-   * Reuses existing senderTag if user previously completed Min KYC registration.
+   * Idempotent against double-clicks via distributed lock + existing referenceId reuse (ISS-07).
    */
   public static async registerAndIssue(
     userId: Types.ObjectId | string,
     input: RegisterAndIssueCardInput
   ): Promise<ICardDocument> {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
-    const card = await this.getCard(objectId);
 
-    if (card.status === "ACTIVE" && card.cardId) {
-      return card;
-    }
+    return await withDistributedLock(`card:issue:${objectId.toString()}`, async () => {
+      const card = await this.getCard(objectId);
 
-    const studentUser = await User.findById(objectId);
-    if (!studentUser) {
-      throw ApiError.unauthorized("User profile not found. Please log in.");
-    }
-
-    // Security check: Ensure input.mobile strictly matches registered profile mobile
-    if (studentUser.mobile && studentUser.mobile !== input.mobile) {
-      throw ApiError.badRequest("Mobile number does not match your registered profile mobile number.");
-    }
-
-    const transbank = TransbankFactory.getProvider();
-    let senderTag = card.senderTag;
-
-    // Step 1: Register customer (API 2) if senderTag not already acquired
-    if (!senderTag) {
-      try {
-        const regResult = await transbank.registerCustomer({
-          name: input.name,
-          mobile: input.mobile,
-          email: input.email,
-          documentType: input.documentType,
-          documentValue: input.documentValue,
-          dateOfBirth: input.dateOfBirth,
-          otp: input.otp,
-          context: {},
-        });
-
-        senderTag = regResult.senderTag;
-        card.senderTag = senderTag;
-        await card.save();
-      } catch (err: unknown) {
-        if (
-          err instanceof ApiError &&
-          (err.statusCode === 409 || err.message?.includes("already registered"))
-        ) {
-          if (card.senderTag) {
-            senderTag = card.senderTag;
-          } else {
-            throw err;
-          }
-        } else {
-          throw err;
-        }
+      if ((card.status === "ACTIVE" || card.status === "ISSUED") && card.cardId) {
+        return card;
       }
-    }
 
-    // Step 2: Trigger Card Create (API 4) if referenceId not yet assigned or status NOT_APPLIED
-    let referenceId = card.referenceId;
-    if (!referenceId || card.status === "NOT_APPLIED") {
-      const createResult = await transbank.createCard({
-        senderTag,
-        cardFormFactor: "VIRTUAL",
-        cardType: "GPR",
-        amount: "0.00",
-        context: {},
-      });
+      // Pending application with reference — do not create again; caller polls status
+      if (
+        card.status === "APPLICATION_PENDING" &&
+        card.referenceId &&
+        this.resolvePlainSenderTag(card)
+      ) {
+        return card;
+      }
 
-      if (createResult.status === "FAILED" || !createResult.referenceId) {
-        card.status = "NOT_APPLIED";
-        card.referenceId = null;
-        await card.save();
+      const studentUser = await User.findById(objectId);
+      if (!studentUser) {
+        throw ApiError.unauthorized("User profile not found. Please log in.");
+      }
+
+      if (studentUser.mobile && studentUser.mobile !== input.mobile) {
         throw ApiError.badRequest(
-          createResult.message || "Card creation request failed on TransBnk gateway."
+          "Mobile number does not match your registered profile mobile number."
         );
       }
 
-      referenceId = createResult.referenceId;
-      card.referenceId = referenceId;
-      card.status = "APPLICATION_PENDING";
-      await card.save();
-    }
+      // Duplicate issuance guard by mobile: another ACTIVE card on same mobile must not exist
+      const mobileOwner = await User.findOne({ mobile: input.mobile });
+      if (mobileOwner && mobileOwner._id.toString() !== objectId.toString()) {
+        const otherCard = await Card.findOne({ userId: mobileOwner._id });
+        if (otherCard && (otherCard.status === "ACTIVE" || otherCard.status === "ISSUED") && otherCard.cardId) {
+          throw ApiError.conflict(
+            "A card has already been issued for this mobile number. Duplicate issuance is not allowed."
+          );
+        }
+      }
 
-    // Step 3: Poll Card Creation Status (API 5)
-    // In live HTTP mode: return APPLICATION_PENDING immediately so user transitions to /card/status and sees live progress.
-    // In mock mode: synchronously poll to finalize for unit tests.
-    let cardStatusResult: {
-      status: "SUBMITTED" | "SUCCESS" | "FAILED";
-      cardId?: string;
-      message?: string;
-      maskedPan?: string;
-    } = {
-      status: "SUBMITTED",
-      message: "Card creation submitted to banking gateway.",
-    };
+      const transbank = TransbankFactory.getProvider();
+      let senderTagPlain = this.resolvePlainSenderTag(card);
 
-    const isHttp = env.TRANSBNK_PROVIDER === "http";
+      if (!senderTagPlain) {
+        try {
+          const regResult = await transbank.registerCustomer({
+            name: input.name,
+            mobile: input.mobile,
+            email: input.email,
+            documentType: input.documentType,
+            documentValue: input.documentValue,
+            dateOfBirth: input.dateOfBirth,
+            otp: input.otp,
+            context: {},
+          });
 
-    if (!isHttp) {
-      try {
-        cardStatusResult = await transbank.getCardCreationStatus({
-          referenceId,
-          senderTag,
+          senderTagPlain = regResult.senderTag;
+          await this.persistEncryptedSenderTag(card, senderTagPlain);
+        } catch (err: unknown) {
+          if (
+            err instanceof ApiError &&
+            (err.statusCode === 409 || err.message?.includes("already registered"))
+          ) {
+            senderTagPlain = this.resolvePlainSenderTag(card);
+            if (!senderTagPlain) {
+              throw err;
+            }
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      if (!senderTagPlain) {
+        throw ApiError.badRequest("Customer registration is required before issuing card.");
+      }
+
+      let referenceId = card.referenceId;
+      if (!referenceId || card.status === "NOT_APPLIED" || card.status === "REJECTED") {
+        const createResult = await transbank.createCard({
+          senderTag: senderTagPlain,
+          cardFormFactor: "VIRTUAL",
+          cardType: "GPR",
+          amount: "0.00",
+          context: {},
         });
 
-        let attempts = 0;
-        const maxAttempts = 5;
-        const pollInterval = 300;
-        while (cardStatusResult.status === "SUBMITTED" && attempts < maxAttempts) {
-          attempts++;
-          await new Promise((resolve) => setTimeout(resolve, pollInterval));
-          cardStatusResult = await transbank.getCardCreationStatus({
-            referenceId,
-            senderTag,
-          });
+        if (createResult.status === "FAILED" || !createResult.referenceId) {
+          card.status = "REJECTED";
+          await card.save();
+          await this.syncIssuancePartners(studentUser, card);
+          throw ApiError.badRequest(
+            createResult.message || "Card creation request failed on TransBnk gateway."
+          );
         }
-      } catch (pollErr) {
-        console.warn("[CARD_SERVICE] Synchronous status check error:", pollErr);
+
+        referenceId = createResult.referenceId;
+        card.referenceId = referenceId;
+        card.status = "APPLICATION_PENDING";
+        await card.save();
       }
-    }
 
-    if (cardStatusResult.status === "FAILED") {
-      // Clear referenceId and reset status so user is not deadlocked and can re-apply
-      card.status = "NOT_APPLIED";
-      card.referenceId = null;
-      await card.save();
-      throw ApiError.badRequest(
-        cardStatusResult.message || "Card creation request failed on TransBnk gateway."
-      );
-    }
+      let cardStatusResult: {
+        status: "SUBMITTED" | "SUCCESS" | "FAILED";
+        cardId?: string;
+        message?: string;
+        maskedPan?: string;
+      } = {
+        status: "SUBMITTED",
+        message: "Card creation submitted to banking gateway.",
+      };
 
-    if (cardStatusResult.status !== "SUCCESS" || !cardStatusResult.cardId) {
-      card.status = "APPLICATION_PENDING";
+      const isHttp = env.TRANSBNK_PROVIDER === "http";
+
+      if (!isHttp) {
+        try {
+          const startedAt = Date.now();
+          let interval = 300;
+          cardStatusResult = await transbank.getCardCreationStatus({
+            referenceId: referenceId!,
+            senderTag: senderTagPlain,
+          });
+
+          while (
+            cardStatusResult.status === "SUBMITTED" &&
+            Date.now() - startedAt < 5_000
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, interval));
+            cardStatusResult = await transbank.getCardCreationStatus({
+              referenceId: referenceId!,
+              senderTag: senderTagPlain,
+            });
+          }
+        } catch (pollErr) {
+          console.warn("[CARD_SERVICE] Synchronous status check error:", pollErr);
+        }
+      }
+
+      if (cardStatusResult.status === "FAILED") {
+        card.status = "REJECTED";
+        await card.save();
+        await this.syncIssuancePartners(studentUser, card);
+        throw ApiError.badRequest(
+          cardStatusResult.message || "Card creation request failed on TransBnk gateway."
+        );
+      }
+
+      if (cardStatusResult.status !== "SUCCESS" || !cardStatusResult.cardId) {
+        card.status = "APPLICATION_PENDING";
+        await card.save();
+        return card;
+      }
+
+      card.cardId = cardStatusResult.cardId;
+      card.status = "ACTIVE";
+      card.issuedAt = new Date();
+      if (cardStatusResult.maskedPan) {
+        card.maskedPan = cardStatusResult.maskedPan;
+      } else if (!card.maskedPan) {
+        card.maskedPan = "•••• •••• •••• ••••";
+      }
+      card.totalLimit = card.kycStatus === "FULL_KYC" ? 200000 : 10000;
       await card.save();
+
+      await this.syncIssuancePartners(studentUser, card);
       return card;
-    }
-
-    // Step 4: Finalize Card Record (PCI-DSS Scoped: store only non-sensitive metadata)
-    card.cardId = cardStatusResult.cardId;
-    card.status = "ACTIVE";
-    card.issuedAt = new Date();
-    card.maskedPan = cardStatusResult.maskedPan || "•••• •••• •••• 8942";
-    card.totalLimit = card.kycStatus === "FULL_KYC" ? 200000 : 10000;
-
-    await card.save();
-
-    // Step 5: Asynchronous Synchronization (ProConnect & ApTrack)
-    const last4 = (card.maskedPan || "8942").replace(/\D/g, "").slice(-4) || "8942";
-
-    if (studentUser?.studentId) {
-      // Aptech enrolled student: sync card details back to ProConnect (Milestone 8 & 9)
-      ProconnectFactory.getProvider()
-        .syncCardIssuance({
-          studentId: studentUser.studentId,
-          mobileNumber: studentUser.mobile,
-          emailId: studentUser.email,
-          cardStatus: "ACTIVE",
-          last4Digits: last4,
-          merchantTransactionId: card.referenceId || `TXN-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-        })
-        .catch((err) => console.warn("[PROCONNECT] Student card sync error:", err));
-    } else if (studentUser) {
-      // Non-Aptech prospect: sync card status to ApTrack CRM (Milestone 18)
-      AptrackFactory.getProvider()
-        .syncLeadCardStatus({
-          mobile: studentUser.mobile,
-          cardStatus: "ACTIVE",
-          last4Digits: last4,
-          cardId: card.cardId || undefined,
-          timestamp: new Date().toISOString(),
-        })
-        .catch((err) => console.warn("[APTRACK] Lead card status sync error:", err));
-    }
-
-    return card;
+    }, { ttlMs: 30_000 });
   }
 
   /**
@@ -237,17 +293,22 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (card.status === "ACTIVE" && card.cardId) {
+    if ((card.status === "ACTIVE" || card.status === "ISSUED") && card.cardId) {
       return card;
     }
 
-    if (!card.senderTag) {
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (!senderTagPlain) {
       throw ApiError.badRequest("Customer registration is required before issuing card (senderTag missing).");
+    }
+
+    if (card.referenceId && card.status === "APPLICATION_PENDING") {
+      return await this.pollCardStatus(objectId);
     }
 
     const transbank = TransbankFactory.getProvider();
     const createResult = await transbank.createCard({
-      senderTag: card.senderTag,
+      senderTag: senderTagPlain,
       cardFormFactor: "VIRTUAL",
       cardType: "GPR",
       amount: "0.00",
@@ -268,12 +329,13 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (!card.senderTag) {
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (!senderTagPlain) {
       throw ApiError.badRequest("Student has not completed card registration (senderTag missing).");
     }
 
     const transbank = TransbankFactory.getProvider();
-    return await transbank.getFullKycUrl({ senderId: card.senderTag });
+    return await transbank.getFullKycUrl({ senderId: senderTagPlain });
   }
 
   /**
@@ -284,7 +346,8 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (!card.senderTag) {
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (!senderTagPlain) {
       return {
         kycStatus: card.kycStatus,
         isCompleted: card.kycStatus === "FULL_KYC",
@@ -295,7 +358,7 @@ export class CardService {
     }
 
     const transbank = TransbankFactory.getProvider();
-    const kycResult = await transbank.getFullKycUrl({ senderId: card.senderTag });
+    const kycResult = await transbank.getFullKycUrl({ senderId: senderTagPlain });
 
     if (!kycResult.kycRequired) {
       if (card.kycStatus !== "FULL_KYC") {
@@ -338,7 +401,8 @@ export class CardService {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (!card.senderTag) {
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (!senderTagPlain) {
       throw ApiError.badRequest("Customer registration is required before completing Full KYC.");
     }
 
@@ -347,11 +411,11 @@ export class CardService {
     // In mock mode or when explicitly mocking verification
     if (input.isMock) {
       if (transbank.simulateKycCompletion) {
-        transbank.simulateKycCompletion(card.senderTag);
+        transbank.simulateKycCompletion(senderTagPlain);
       }
     } else if (env.TRANSBNK_PROVIDER === "http") {
       // In live HTTP mode, verify with TransBnk / Oxymoney that KYC was actually completed
-      const kycStatusResult = await transbank.getFullKycUrl({ senderId: card.senderTag });
+      const kycStatusResult = await transbank.getFullKycUrl({ senderId: senderTagPlain });
       if (kycStatusResult.kycRequired) {
         throw ApiError.badRequest(
           "Full KYC has not yet been verified on the Oxymoney gateway. Please complete verification via the portal."
@@ -359,7 +423,7 @@ export class CardService {
       }
     } else if (transbank.simulateKycCompletion) {
       // In mock/dev/test mode: simulate approved KYC
-      transbank.simulateKycCompletion(card.senderTag);
+      transbank.simulateKycCompletion(senderTagPlain);
     }
 
     card.kycStatus = "FULL_KYC";
@@ -383,8 +447,9 @@ export class CardService {
     const card = await this.getCard(objectId);
 
     const transbank = TransbankFactory.getProvider();
-    if (card.senderTag && transbank.simulateKycCompletion) {
-      transbank.simulateKycCompletion(card.senderTag);
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (senderTagPlain && transbank.simulateKycCompletion) {
+      transbank.simulateKycCompletion(senderTagPlain);
     }
 
     card.kycStatus = "FULL_KYC";
@@ -396,16 +461,18 @@ export class CardService {
 
   /**
    * Polls asynchronous card creation status from TransBnk (API 5).
+   * Client should poll until SUCCESS/FAILED/REJECTED or until max wait (~120s) with backoff (ISS-03).
    */
   public static async pollCardStatus(userId: Types.ObjectId | string): Promise<ICardDocument> {
     const objectId = typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const card = await this.getCard(objectId);
 
-    if (card.status === "ACTIVE") {
+    if (card.status === "ACTIVE" || card.status === "ISSUED" || card.status === "REJECTED") {
       return card;
     }
 
-    if (!card.referenceId || !card.senderTag) {
+    const senderTagPlain = this.resolvePlainSenderTag(card);
+    if (!card.referenceId || !senderTagPlain) {
       if (card.status === "APPLICATION_PENDING" && !card.referenceId) {
         card.status = "NOT_APPLIED";
         await card.save();
@@ -413,63 +480,62 @@ export class CardService {
       return card;
     }
 
+    const pollMetaKey = `tb:poll:meta:${card.referenceId}`;
     const pollThrottleKey = `tb:poll:${card.referenceId}`;
+
+    type PollMeta = { startedAt: number; intervalMs: number };
+    let meta = await CacheService.get<PollMeta>(pollMetaKey);
+    if (!meta) {
+      meta = { startedAt: Date.now(), intervalMs: CARD_POLL_BASE_INTERVAL_MS };
+      await CacheService.set(pollMetaKey, meta, Math.ceil(CARD_POLL_MAX_WAIT_MS / 1000) + 30);
+    }
+
+    if (Date.now() - meta.startedAt > CARD_POLL_MAX_WAIT_MS) {
+      // Leave APPLICATION_PENDING; client stops and shows timeout. Do not invent FAILED.
+      return card;
+    }
+
     const isThrottled = await CacheService.get<boolean>(pollThrottleKey);
     if (isThrottled) {
       return card;
     }
-    // Set 2-second buffer window
-    await CacheService.set(pollThrottleKey, true, 2);
+
+    const throttleSeconds = Math.max(2, Math.ceil(meta.intervalMs / 1000));
+    await CacheService.set(pollThrottleKey, true, throttleSeconds);
+
+    // Exponential backoff for subsequent polls (2s → 4s → 8s)
+    meta.intervalMs = Math.min(CARD_POLL_MAX_INTERVAL_MS, meta.intervalMs * 2);
+    await CacheService.set(pollMetaKey, meta, Math.ceil(CARD_POLL_MAX_WAIT_MS / 1000) + 30);
 
     const transbank = TransbankFactory.getProvider();
     try {
       const statusResult = await transbank.getCardCreationStatus({
         referenceId: card.referenceId,
-        senderTag: card.senderTag,
+        senderTag: senderTagPlain,
       });
 
       if (statusResult.status === "SUCCESS") {
         card.cardId = statusResult.cardId;
         card.status = "ACTIVE";
         card.issuedAt = new Date();
-        card.maskedPan = statusResult.maskedPan || "•••• •••• •••• 8942";
+        if (statusResult.maskedPan) {
+          card.maskedPan = statusResult.maskedPan;
+        } else if (!card.maskedPan) {
+          card.maskedPan = "•••• •••• •••• ••••";
+        }
         card.totalLimit = card.kycStatus === "FULL_KYC" ? 200000 : 10000;
         await card.save();
 
         const studentUser = await User.findById(objectId);
-        const last4 = (card.maskedPan || "8942").replace(/\D/g, "").slice(-4) || "8942";
-
-        if (studentUser?.studentId) {
-          ProconnectFactory.getProvider()
-            .syncCardIssuance({
-              studentId: studentUser.studentId,
-              mobileNumber: studentUser.mobile,
-              emailId: studentUser.email,
-              cardStatus: "ACTIVE",
-              last4Digits: last4,
-              merchantTransactionId: card.referenceId,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) => console.warn("[PROCONNECT] Polled card sync error:", err));
-        } else if (studentUser) {
-          AptrackFactory.getProvider()
-            .syncLeadCardStatus({
-              mobile: studentUser.mobile,
-              cardStatus: "ACTIVE",
-              last4Digits: last4,
-              cardId: card.cardId,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) => console.warn("[APTRACK] Polled card sync error:", err));
-        }
+        await this.syncIssuancePartners(studentUser, card);
       } else if (statusResult.status === "FAILED") {
-        card.status = "NOT_APPLIED";
-        card.referenceId = null;
+        card.status = "REJECTED";
         await card.save();
+        const studentUser = await User.findById(objectId);
+        await this.syncIssuancePartners(studentUser, card);
       }
     } catch (err) {
       console.warn("[CARD_SERVICE] pollCardStatus transient error during polling cycle:", err);
-      // Return card gracefully in its current APPLICATION_PENDING state
     }
 
     return card;
@@ -510,8 +576,8 @@ export class CardService {
 
     return {
       cardId: card.cardId,
-      senderTag: card.senderTag,
-      maskedPan: card.maskedPan || "•••• •••• •••• 8942",
+      // Never expose senderTag (encrypted or plaintext) to the browser (SEC-01 / SEC-04)
+      maskedPan: card.maskedPan || "•••• •••• •••• ••••",
       holderName: studentUser.name || "Cardholder",
       clientId: env.OXYMONEY_CLIENT_ID || env.TRANSBNK_CLIENT_ID,
       clientToken: effectiveToken,
@@ -547,6 +613,16 @@ export class CardService {
     if (!card.cardId) {
       throw ApiError.badRequest(
         "Active card ID is missing. Please poll card status or contact support."
+      );
+    }
+
+    const perLoadMax =
+      card.kycStatus === "FULL_KYC" ? FULL_KYC_PER_LOAD_MAX : MIN_KYC_PER_LOAD_MAX;
+    if (input.amount > perLoadMax) {
+      throw ApiError.badRequest(
+        `Maximum load amount is ₹${perLoadMax.toLocaleString("en-IN")} for ${
+          card.kycStatus === "FULL_KYC" ? "Full KYC" : "Min KYC"
+        } cards.`
       );
     }
 

@@ -5,6 +5,7 @@ import { User, type IUserDocument } from "../user/user.model.js";
 import { VoucherRedemption, type VoucherStatus } from "./voucherRedemption.model.js";
 import { DebitTransaction } from "./debitTransaction.model.js";
 import { AptechCoinFactory } from "../../services/aptech-coins/index.js";
+import { ProconnectFactory } from "../../services/proconnect/index.js";
 import { encryptSensitive, decryptSensitive } from "../../utils/crypto.js";
 import { withDistributedLock } from "../../utils/distributedLock.js";
 import type {
@@ -600,6 +601,29 @@ export class HubbleService {
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
+
+    // RWD-08: Sync successful redemptions + remaining balance to ProConnect (non-blocking)
+    if (
+      user.studentId &&
+      (normalizedStatus === "ACTIVE" || normalizedStatus === "USED") &&
+      pointsDebited > 0
+    ) {
+      void (async () => {
+        try {
+          const coinData = await AptechCoinFactory.getProvider().getBalance(user.studentId!);
+          await ProconnectFactory.getProvider().syncRedemption({
+            studentId: user.studentId!,
+            orderId,
+            pointsSpent: pointsDebited,
+            remainingBalance: coinData.balance,
+            voucherName: brandName,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (syncErr) {
+          console.warn("[PROCONNECT] Redemption sync failed (non-blocking):", syncErr);
+        }
+      })();
+    }
 
     return voucher;
   }

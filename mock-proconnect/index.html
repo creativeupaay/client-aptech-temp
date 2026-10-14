@@ -359,6 +359,16 @@
             </div>
             <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 9352008792</span>
           </button>
+
+          <button type="button" onclick="setPersona(6)" id="pCard6"
+          class="text-left p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white transition cursor-pointer flex flex-col justify-between">
+          <div>
+            <span class="text-[10px] font-bold text-teal-600 uppercase tracking-wider block mb-1">VERIFIED (FULL KYC)</span>
+            <p class="font-bold text-xs text-gray-900">Ronak Paul</p>
+            <p class="text-[11px] font-mono text-gray-500 mt-0.5">APT-2026-RONAK</p>
+          </div>
+          <span class="text-[10px] text-gray-500 mt-2 block">Mobile: 8822412697</span>
+        </button>
         </div>
 
         <!-- Editable Form Parameters -->
@@ -450,6 +460,7 @@
         program: "Arena Animation Prime",
         center: "Bangalore Whitefield (KA-04)"
       },
+      
       {
         studentId: "APT-2026-01554",
         name: "Sneha Patel",
@@ -467,7 +478,18 @@
         initials: "SO",
         program: "Full Stack Software Engineering",
         center: "Jaipur Center (RJ-01)"
-      }
+      },
+
+      {
+        studentId: "APT-2026-RONAK",
+        name: "Ronak Paul",
+        mobile: "8822412697",
+        email: "ronakpaul.creative@gmail.com",
+        initials: "RP",
+        program: "Full Stack Software Engineering",
+        center: "Jaipur Center (RJ-01)"
+      },
+      
     ];
 
     let currentPersona = 0;
@@ -650,7 +672,7 @@
       btnSpinner.classList.remove("hidden");
 
       try {
-        const response = await fetch("https://api-aptech-uat.creativeupaay.com/api/v1/auth/sso/simulate-code", {
+        const response = await fetch("http://localhost:8000/api/v1/auth/sso/simulate-code", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

@@ -136,6 +136,21 @@ export const cardOtpIpLimiter = createRateLimiter({
 export const cardOtpLimiter = sendOtpLimiter;
 
 /**
+ * Card register-and-issue abuse protection (10 requests per 10 minutes per user/IP).
+ */
+export const cardIssueLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  message: "Too many card issuance attempts. Please wait 10 minutes before retrying.",
+  prefix: "card_issue",
+  keyGenerator: (req) => {
+    const userId = (req as { user?: { id?: string } }).user?.id;
+    if (userId) return `card_issue_user_${userId}`;
+    return `card_issue_ip_${req.ip || req.socket.remoteAddress || "anonymous"}`;
+  },
+});
+
+/**
  * Limiter for Hubble Store launch requests (10 requests per minute).
  */
 export const hubbleLaunchLimiter = createRateLimiter({

@@ -31,6 +31,7 @@ const studentCoins = new Map([
   ["APT-2026-00892", 500],
   ["APT-2026-LIVE01", 500],
   ["APT-2026-MANISH", 500],
+  ["APT-2026-RONAK", 500],
   ["APT-2026-SOURABH", 500],
 ]);
 const DEFAULT_COIN_BALANCE = 500;

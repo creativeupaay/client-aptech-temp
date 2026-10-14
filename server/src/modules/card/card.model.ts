@@ -7,6 +7,7 @@ export const CARD_STATUSES = [
   "ACTIVE",
   "FROZEN",
   "BLOCKED",
+  "REJECTED",
 ] as const;
 
 export type CardStatus = (typeof CARD_STATUSES)[number];
@@ -112,6 +113,8 @@ const cardSchema = new Schema<ICardDocument>(
         delete ret.cvv;
         delete ret.cardNumber;
         delete ret.expiry;
+        // Never expose encrypted sender_tag to API clients (SEC-01 / SEC-04)
+        delete ret.senderTag;
         return ret;
       },
     },

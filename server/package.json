@@ -17,7 +17,8 @@
     "docs:export": "tsx scripts/export-docs.ts",
     "seed:users": "tsx scripts/seed-users.ts",
     "seed:amit": "tsx scripts/seed-user-amit.ts",
-    "seed:manish": "tsx scripts/seed-user-manish.ts"
+    "seed:manish": "tsx scripts/seed-user-manish.ts",
+    "seed:ronak": "tsx scripts/seed-user-ronak.ts"
   },
   "keywords": [],
   "author": "",
