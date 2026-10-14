@@ -2,7 +2,14 @@ import { baseApi } from "../../store/api/baseApi";
 
 export interface CardData {
   userId: string;
-  status: "NOT_APPLIED" | "APPLICATION_PENDING" | "ISSUED" | "ACTIVE" | "FROZEN" | "BLOCKED";
+  status:
+    | "NOT_APPLIED"
+    | "APPLICATION_PENDING"
+    | "ISSUED"
+    | "ACTIVE"
+    | "FROZEN"
+    | "BLOCKED"
+    | "REJECTED";
   cardType: "VIRTUAL" | "PHYSICAL";
   kycStatus: "MIN_KYC" | "FULL_KYC";
   senderTag?: string | null;
