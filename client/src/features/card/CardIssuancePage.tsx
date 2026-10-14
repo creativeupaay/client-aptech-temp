@@ -23,6 +23,8 @@ export const CardIssuancePage: React.FC = () => {
   const studentId = user?.studentId || "";
   const userMobile = user?.mobile ? user.mobile.replace(/\D/g, "").slice(-10) : "";
   const userEmail = user?.email || "";
+  // SSO-04: lock identity fields pre-populated from ProConnect / session profile
+  const profileFieldsLocked = Boolean(user?.name && user?.email && user?.mobile);
 
   const initials =
     studentName
@@ -532,8 +534,11 @@ export const CardIssuancePage: React.FC = () => {
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   onBlur={() => handleBlur("name", name)}
+                  readOnly={profileFieldsLocked}
                   placeholder="Enter your full legal name"
-                  className={`w-full h-11 px-3.5 border rounded-xl outline-hidden transition text-gray-900 bg-white ${
+                  className={`w-full h-11 px-3.5 border rounded-xl outline-hidden transition text-gray-900 ${
+                    profileFieldsLocked ? "bg-gray-50 cursor-not-allowed" : "bg-white"
+                  } ${
                     touched.name && errors.name
                       ? "border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500/20 bg-red-50/10"
                       : "border-gray-200 focus:border-[#DB6516] focus:ring-1 focus:ring-[#DB6516]"
@@ -546,7 +551,9 @@ export const CardIssuancePage: React.FC = () => {
                   </p>
                 ) : (
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Must match the name on your official government identification
+                    {profileFieldsLocked
+                      ? "Pre-filled from your Aptech ProConnect profile"
+                      : "Must match the name on your official government identification"}
                   </p>
                 )}
               </div>
@@ -568,8 +575,11 @@ export const CardIssuancePage: React.FC = () => {
                   value={email}
                   onChange={(e) => handleEmailChange(e.target.value)}
                   onBlur={() => handleBlur("email", email)}
+                  readOnly={profileFieldsLocked}
                   placeholder="name@example.com"
-                  className={`w-full h-11 px-3.5 border rounded-xl outline-hidden transition text-gray-900 bg-white ${
+                  className={`w-full h-11 px-3.5 border rounded-xl outline-hidden transition text-gray-900 ${
+                    profileFieldsLocked ? "bg-gray-50 cursor-not-allowed" : "bg-white"
+                  } ${
                     touched.email && errors.email
                       ? "border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500/20 bg-red-50/10"
                       : "border-gray-200 focus:border-[#DB6516] focus:ring-1 focus:ring-[#DB6516]"
@@ -582,7 +592,9 @@ export const CardIssuancePage: React.FC = () => {
                   </p>
                 ) : (
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Used for card issuance receipts and monthly transaction statements
+                    {profileFieldsLocked
+                      ? "Pre-filled from your Aptech ProConnect profile"
+                      : "Used for card issuance receipts and monthly transaction statements"}
                   </p>
                 )}
               </div>
@@ -713,7 +725,9 @@ export const CardIssuancePage: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     <div
-                      className={`flex-1 flex items-center h-11 border rounded-xl px-3 bg-white transition ${
+                      className={`flex-1 flex items-center h-11 border rounded-xl px-3 transition ${
+                        profileFieldsLocked ? "bg-gray-50" : "bg-white"
+                      } ${
                         touched.mobile && errors.mobile
                           ? "border-red-400 ring-1 ring-red-500/20"
                           : "border-gray-200 focus-within:border-[#DB6516] focus-within:ring-1 focus-within:ring-[#DB6516]"
@@ -727,9 +741,12 @@ export const CardIssuancePage: React.FC = () => {
                         value={mobile}
                         onChange={(e) => handleMobileChange(e.target.value)}
                         onBlur={() => handleBlur("mobile", mobile)}
+                        readOnly={profileFieldsLocked}
                         placeholder="10-digit mobile"
                         maxLength={10}
-                        className="w-full text-sm outline-hidden text-gray-900 font-mono"
+                        className={`w-full text-sm outline-hidden text-gray-900 font-mono ${
+                          profileFieldsLocked ? "cursor-not-allowed" : ""
+                        }`}
                       />
                     </div>
                     <button

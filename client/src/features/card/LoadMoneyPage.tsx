@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell } from "lucide-react";
 import { useGetMeQuery } from "../auth/authApi";
@@ -9,7 +9,7 @@ import {
 } from "./components/UpiPaymentSelector";
 import { MoneyAddedSuccessModal } from "./components/MoneyAddedSuccessModal";
 
-const PRESET_AMOUNTS = [100, 500, 1000, 2000, 5000, 10000];
+const ALL_PRESET_AMOUNTS = [100, 500, 1000, 2000, 5000, 10000];
 
 export const LoadMoneyPage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,9 +31,21 @@ export const LoadMoneyPage: React.FC = () => {
 
   const card = cardData?.data?.card;
   const cardBalance = card?.availableBalance ?? 0;
+  const perLoadMax = card?.kycStatus === "FULL_KYC" ? 200000 : 10000;
+  const presetAmounts = useMemo(
+    () => ALL_PRESET_AMOUNTS.filter((a) => a <= perLoadMax),
+    [perLoadMax]
+  );
+
+  // Stable idempotency key for retries until success (LOD-09)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `load_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  );
 
   // Selected state
-  const [amount, setAmount] = useState<number>(10000);
+  const [amount, setAmount] = useState<number>(100);
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethodType>("Google Pay");
   const [customUpiId, setCustomUpiId] = useState<string>("");
@@ -49,6 +61,12 @@ export const LoadMoneyPage: React.FC = () => {
 
   const handlePay = async () => {
     setErrorMessage(null);
+    if (amount > perLoadMax) {
+      setErrorMessage(
+        `Maximum load amount is ₹${perLoadMax.toLocaleString("en-IN")} for your KYC level.`
+      );
+      return;
+    }
     try {
       const chosenMethod =
         paymentMethod === "Custom UPI"
@@ -57,14 +75,18 @@ export const LoadMoneyPage: React.FC = () => {
             : "UPI ID"
           : `${paymentMethod} (UPI)`;
 
-      const idempotencyKey = `load_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
       const response = await loadMoneyMutation({
         amount,
         paymentMethod: chosenMethod,
         upiId: customUpiId || undefined,
-        idempotencyKey,
+        idempotencyKey: idempotencyKeyRef.current,
       }).unwrap();
+
+      // Rotate key after success so a new load is a new logical operation
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `load_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
       setSuccessReceipt({
         amount: response.data.amount,
@@ -155,7 +177,7 @@ export const LoadMoneyPage: React.FC = () => {
 
                 {/* Amount preset pills */}
                 <div className="flex flex-wrap gap-2.5">
-                  {PRESET_AMOUNTS.map((amt) => {
+                  {presetAmounts.map((amt) => {
                     const isSelected = amount === amt;
                     return (
                       <button

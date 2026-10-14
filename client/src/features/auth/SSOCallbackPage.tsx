@@ -38,13 +38,20 @@ export const SSOCallbackPage: React.FC = () => {
           localStorage.setItem("tbx_student_user", JSON.stringify(response.data.user));
         }
 
-        // Brief delay for user feedback, then transition to dashboard, status, or issuance
+        // Brief delay for user feedback, then transition to My Cards / status / issuance
         setTimeout(() => {
           const cardStatus = response.data?.card?.status;
           if (cardStatus === "APPLICATION_PENDING") {
             navigate("/card/status", { replace: true });
+          } else if (cardStatus === "REJECTED") {
+            navigate("/card/issuance", { replace: true });
           } else {
-            const isIssued = cardStatus === "ISSUED" || cardStatus === "ACTIVE" || cardStatus === "FROZEN" || cardStatus === "BLOCKED";
+            const isIssued =
+              cardStatus === "ISSUED" ||
+              cardStatus === "ACTIVE" ||
+              cardStatus === "FROZEN" ||
+              cardStatus === "BLOCKED";
+            // Issued cards go straight to My Cards (dashboard)
             navigate(isIssued ? "/dashboard" : "/card/issuance", { replace: true });
           }
         }, 1200);

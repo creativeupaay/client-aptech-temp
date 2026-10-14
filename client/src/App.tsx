@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AccessViaProconnectPage, SSOCallbackPage } from "./features/auth";
-import { StudentDashboardPage } from "./features/dashboard";
+import { StudentDashboardPage, RecentActivityPage } from "./features/dashboard";
 import {
   CardIssuancePage,
   CardStatusPage,
@@ -33,6 +33,15 @@ function App() {
           element={
             <ProtectedRoute>
               <StudentDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/activity"
+          element={
+            <ProtectedRoute>
+              <RecentActivityPage />
             </ProtectedRoute>
           }
         />

@@ -90,11 +90,17 @@ export const RewardStats: React.FC<RewardStatsProps> = ({
         </p>
       </div>
 
-      {/* Redeem Vouchers Card with Diagonal Radial Gradients & Crossing Grid Lines */}
+      {/* Redeem Vouchers — disabled when loyalty points are insufficient (RWD-05) */}
       <button
         type="button"
         onClick={onRedeemVouchers}
-        className="relative overflow-hidden rounded-[12px] w-full sm:flex-1 h-[73px] flex items-center group cursor-pointer transition-all active:scale-[0.99] text-left shadow-2xs select-none"
+        disabled={loyaltyPoints <= 0 || !onRedeemVouchers}
+        title={
+          loyaltyPoints <= 0
+            ? "You need loyalty points to redeem vouchers"
+            : "Redeem vouchers"
+        }
+        className="relative overflow-hidden rounded-[12px] w-full sm:flex-1 h-[73px] flex items-center group cursor-pointer transition-all active:scale-[0.99] text-left shadow-2xs select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
         style={{
           height: "73px",
           borderRadius: "12px",

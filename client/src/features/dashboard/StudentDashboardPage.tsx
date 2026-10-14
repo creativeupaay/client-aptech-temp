@@ -24,6 +24,7 @@ import {
   HelpSupport,
 } from "./components";
 import { KycUpgradedSuccessModal } from "../card/components/KycUpgradedSuccessModal";
+import { env } from "../../config/env.config";
 
 export const StudentDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -361,6 +362,7 @@ export const StudentDashboardPage: React.FC = () => {
             {/* Recent Transactions List */}
             <RecentTransactions
               transactions={transactionsList}
+              onViewAll={() => navigate("/activity")}
               onRefresh={handleRefreshActivity}
               isRefreshing={isHubbleHistoryFetching || isTransactionsFetching}
             />
@@ -369,7 +371,14 @@ export const StudentDashboardPage: React.FC = () => {
             <FinancialSolutions />
 
             {/* Help & Support Contact Cards */}
-            <HelpSupport />
+            <HelpSupport
+              onContactCardSupport={() => {
+                window.location.href = env.SUPPORT_URL;
+              }}
+              onContactLoyaltySupport={() => {
+                window.location.href = env.SUPPORT_URL;
+              }}
+            />
           </div>
         </div>
       </main>

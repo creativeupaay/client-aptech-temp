@@ -23,9 +23,9 @@ export const MoneyAddedSuccessModal: React.FC<MoneyAddedSuccessModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
       <div
-        className="bg-white w-full max-w-[440px] rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center border border-gray-100 animate-scale-up"
+        className="bg-white w-full max-w-[440px] rounded-t-3xl md:rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center border border-gray-100 animate-scale-up"
         role="dialog"
         aria-modal="true"
       >

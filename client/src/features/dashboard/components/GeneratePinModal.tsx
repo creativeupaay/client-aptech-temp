@@ -56,11 +56,11 @@ export const GeneratePinModal: React.FC<GeneratePinModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] transition-opacity"
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-[2px] transition-opacity"
       onClick={handleClose}
     >
       <div
-        className="w-full max-w-[390px] bg-white rounded-[24px] p-6 sm:p-7 shadow-xl border border-[#E8E8EB] relative transform transition-all"
+        className="w-full max-w-[390px] bg-white rounded-t-[24px] md:rounded-[24px] p-6 sm:p-7 shadow-xl border border-[#E8E8EB] relative transform transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header: Title & Close Button */}

@@ -69,9 +69,9 @@ export const TermsAndConditionsModal: React.FC<TermsAndConditionsModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
       <div
-        className="bg-white w-full max-w-[640px] max-h-[90vh] rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-100"
+        className="bg-white w-full max-w-[640px] max-h-[90vh] rounded-t-2xl md:rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-100"
         role="dialog"
         aria-modal="true"
         aria-labelledby="terms-modal-title"

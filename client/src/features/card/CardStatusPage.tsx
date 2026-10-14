@@ -1,25 +1,39 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, AlertCircle } from "lucide-react";
 import { useGetMeQuery } from "../auth/authApi";
 import { useGetCardQuery, usePollCardStatusQuery } from "./cardApi";
 import { aptechLogo, cardBg } from "../../assets/dashboard";
+
+/** Max client-side poll window (~120s) with backoff towards 8s (ISS-03). */
+const POLL_MAX_MS = 120_000;
+const POLL_BASE_MS = 2_000;
+const POLL_MAX_INTERVAL_MS = 8_000;
 
 export const CardStatusPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: meData } = useGetMeQuery();
   const { data: cardRes, isLoading: isCardLoading, refetch: refetchCard } = useGetCardQuery();
+  const [pollIntervalMs, setPollIntervalMs] = useState(POLL_BASE_MS);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const pollStartedAt = useRef(Date.now());
 
+  const initialStatus = cardRes?.data?.card?.status;
   const isAlreadyActive =
-    cardRes?.data?.card?.status === "ACTIVE" ||
-    cardRes?.data?.card?.status === "ISSUED" ||
-    cardRes?.data?.card?.status === "FROZEN" ||
-    cardRes?.data?.card?.status === "BLOCKED";
+    initialStatus === "ACTIVE" ||
+    initialStatus === "ISSUED" ||
+    initialStatus === "FROZEN" ||
+    initialStatus === "BLOCKED";
 
-  // Automatically poll status from TransBnk (API 5) every 2s until active
-  // Note: we do NOT use skip: true so pollRes is never wiped from component state
+  const isInitiallyRejected = initialStatus === "REJECTED";
+
+  // Poll until we know terminal state from either cache or live poll payload
+  const [stopPolling, setStopPolling] = useState(false);
+  const shouldPoll =
+    !isAlreadyActive && !isInitiallyRejected && !pollTimedOut && !stopPolling;
+
   const { data: pollRes } = usePollCardStatusQuery(undefined, {
-    pollingInterval: isAlreadyActive ? 0 : 2000,
+    pollingInterval: shouldPoll ? pollIntervalMs : 0,
     refetchOnMountOrArgChange: true,
   });
 
@@ -33,16 +47,39 @@ export const CardStatusPage: React.FC = () => {
     liveCard?.status === "FROZEN" ||
     liveCard?.status === "BLOCKED";
 
-  const isCardPending = !isCardActive && (liveCard?.status === "APPLICATION_PENDING" || !liveCard);
+  const isCardRejected = liveCard?.status === "REJECTED";
+  const isCardPending =
+    !isCardActive &&
+    !isCardRejected &&
+    (liveCard?.status === "APPLICATION_PENDING" || !liveCard);
 
-  // When card transitions to active via polling, synchronize getCard cache across the app
+  // Stop polling once poll payload reaches a terminal status
+  useEffect(() => {
+    if (isCardActive || isCardRejected) {
+      setStopPolling(true);
+    }
+  }, [isCardActive, isCardRejected]);
+
+  // Backoff + hard timeout for polling (single timer; interval only used for RTK)
+  useEffect(() => {
+    if (!shouldPoll) return;
+    const timeoutId = window.setTimeout(() => {
+      const elapsed = Date.now() - pollStartedAt.current;
+      if (elapsed >= POLL_MAX_MS) {
+        setPollTimedOut(true);
+        return;
+      }
+      setPollIntervalMs((prev) => Math.min(POLL_MAX_INTERVAL_MS, Math.max(prev * 2, POLL_BASE_MS)));
+    }, pollIntervalMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [shouldPoll, pollIntervalMs]);
+
   useEffect(() => {
     if (isCardActive && cardRes?.data?.card?.status !== "ACTIVE") {
       refetchCard();
     }
   }, [isCardActive, cardRes?.data?.card?.status, refetchCard]);
 
-  // If card is not applied, redirect to card issuance
   useEffect(() => {
     if (!isCardLoading && cardRes && liveCard?.status === "NOT_APPLIED") {
       navigate("/card/issuance", { replace: true });
@@ -76,7 +113,32 @@ export const CardStatusPage: React.FC = () => {
 
       {/* Main Container Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-[0_20px_50px_-15px_rgba(0,0,0,0.07)] border border-gray-100/80 relative z-10 transition-all">
-        {isCardPending ? (
+        {isCardRejected || (isCardPending && pollTimedOut) ? (
+          <div className="text-center space-y-6 py-3">
+            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto ring-8 ring-red-50/60">
+              <div className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                <AlertCircle className="w-7 h-7 text-white stroke-[2.5]" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <h1 className="text-2xl font-bold text-[#1C1C21] tracking-tight">
+                {isCardRejected ? "Card Application Rejected" : "Activation Taking Longer"}
+              </h1>
+              <p className="text-sm text-gray-600 max-w-sm mx-auto leading-relaxed">
+                {isCardRejected
+                  ? "Your card application was rejected by the banking partner. You can review your details and re-apply."
+                  : "Card activation is still pending with the bank. Please check back from My Cards shortly, or re-apply if the status does not update."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(isCardRejected ? "/card/issuance" : "/dashboard")}
+              className="w-full h-12 bg-[#DB6516] hover:bg-[#C05510] text-white font-bold rounded-xl text-sm transition cursor-pointer"
+            >
+              {isCardRejected ? "Re-apply for Card" : "Go to My Cards"}
+            </button>
+          </div>
+        ) : isCardPending ? (
           /* ========================================================
              1. IN-PROGRESS / APPLICATION_PENDING STATE
              ======================================================== */
